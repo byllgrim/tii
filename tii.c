@@ -19,8 +19,16 @@ struct channel {
 static void
 print_channels(struct channel *ch)
 {
-	printf("[%s]\n", ch[0].name);
-	/* TODO print all channels */
+	size_t i;
+
+	printf("ch: ");
+	for (i = 0; i < MAXCHN; i++) {
+		if (ch[i].selected)
+			printf("[%s]", ch[i].name);
+		else
+			printf(" %s ", ch[i].name);
+	}
+	puts("");
 }
 
 int
@@ -28,11 +36,9 @@ main(void)
 {
 	DIR *d;
 	struct dirent *ds;
-	struct channel ch[MAXCHN];
+	struct channel ch[MAXCHN] = {0};
 	size_t i;
 	char cmd[BUFSIZ];
-
-	/* TODO explicit_bzero the array of channels */
 
 	d = opendir("./"); /* TODO error checking */
 	ch[0].name[0] = '\0';
@@ -54,10 +60,11 @@ main(void)
 
 		i++;
 	}
+	ch[0].selected = 1; /* TODO use index instead */
 
-	 while (1) {
+	while (1) {
 		cmd[0] = '\0';
-		strcat(cmd, "tail -n24 ./");
+		strcat(cmd, "tail -n24 ./"); /* TODO -n = ? */
 		strcat(cmd, ch[0].name);
 		strcat(cmd, "/out");
 		system(cmd);
@@ -66,6 +73,7 @@ main(void)
 
 		printf("in: ");
 		getchar();
+		/* TODO input don't block output */
 	}
 
 	return 0;
