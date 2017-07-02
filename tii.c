@@ -2,6 +2,7 @@
 
 #include <dirent.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 enum {
@@ -11,9 +12,16 @@ enum {
 
 struct channel {
 	char name[NAMELEN];
+	int selected; /* TODO use index variable instead */
 	int notify;
-	int select;
 };
+
+static void
+print_channels(struct channel *ch)
+{
+	printf("[%s]\n", ch[0].name);
+	/* TODO print all channels */
+}
 
 int
 main(void)
@@ -22,6 +30,7 @@ main(void)
 	struct dirent *ds;
 	struct channel ch[MAXCHN];
 	size_t i;
+	char cmd[BUFSIZ];
 
 	/* TODO explicit_bzero the array of channels */
 
@@ -44,6 +53,19 @@ main(void)
 		}
 
 		i++;
+	}
+
+	 while (1) {
+		cmd[0] = '\0';
+		strcat(cmd, "tail -n24 ./");
+		strcat(cmd, ch[0].name);
+		strcat(cmd, "/out");
+		system(cmd);
+
+		print_channels(ch);
+
+		printf("in: ");
+		getchar();
 	}
 
 	return 0;
