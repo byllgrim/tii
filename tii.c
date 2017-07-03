@@ -37,7 +37,7 @@ print_channels(struct channel *ch, size_t idx) /* TODO assuming MAXCH */
 }
 
 static void
-send_input(char *msg, size_t n, struct channel *ch, size_t i)
+send_input(char *msg, size_t n, struct channel *ch, size_t idx)
 {
 	FILE *f;
 	char p[BUFSIZ]; /* TODO too big size */
@@ -45,10 +45,12 @@ send_input(char *msg, size_t n, struct channel *ch, size_t i)
 	p[0] = '\0';
 	strcat(p, "./");
 	strcat(p, ch[0].name);
+	if (idx) {
+		strcat(p, "/");
+		strcat(p, ch[idx].name);
+	}
 	strcat(p, "/in");
-	/* strcat(p, ""); TOOD if !i */
-	(void)i; /* TODO don't default to 0 */
-	/* TODO check if file exist */
+	/* TODO check if joined channel */
 	/* TODO check if ii is running */
 	if (!(f = fopen(p, "a"))) {
 		printf("send_input: failed to open file\n");
@@ -169,7 +171,7 @@ main(void)
 		printf("in: ");
 		get_input(in, sizeof(in), &idx);
 		if (in[0])
-			send_input(in, strlen(in), ch, 0);
+			send_input(in, strlen(in), ch, idx);
 		/* TODO input don't block output */
 	}
 
