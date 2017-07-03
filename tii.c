@@ -156,6 +156,10 @@ main(void)
 		cmd[0] = '\0';
 		strcat(cmd, "tail -n24 ./"); /* TODO -n = ? */
 		strcat(cmd, ch[0].name);
+		if (idx) {
+			strcat(cmd, "/");
+			strcat(cmd, ch[idx].name);
+		}
 		strcat(cmd, "/out");
 		system(cmd);
 		/* TODO use read() */
