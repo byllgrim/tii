@@ -59,6 +59,7 @@ send_input(char *msg, size_t n, struct channel *ch, size_t idx)
 	}
 
 	/* TODO proper error checking */
+	/* TODO check if 'in' fifo points to anything */
 	if (fwrite(msg, sizeof(char), n, f))
 		printf("sent success\n");
 	else
@@ -76,6 +77,8 @@ get_input(char *buf, size_t n, size_t *idx)
 	size_t i;
 
 	for (i = 0; i < n - 1; i++) {
+		/* TODO don't wait if no input */
+		/* TODO loop many times; don't hang */
 		c = getchar(); /* TODO don't block output */
 		/* TODO no echo */
 
