@@ -16,18 +16,17 @@ enum {
 
 struct channel {
 	char name[NAMELEN];
-	int selected; /* TODO use index variable instead */
 	int notify;
 };
 
 static void
-print_channels(struct channel *ch) /* TODO assuming MAXCH */
+print_channels(struct channel *ch, size_t idx) /* TODO assuming MAXCH */
 {
 	size_t i;
 
 	printf("ch: ");
 	for (i = 0; i < MAXCHN; i++) {
-		if (ch[i].selected)
+		if (i == idx)
 			printf("[%s]", ch[i].name);
 		else
 			printf(" %s%c",
@@ -69,25 +68,30 @@ send_input(char *msg, size_t n, struct channel *ch, size_t i)
 }
 
 static void
-get_input(char *buf, size_t n)
+get_input(char *buf, size_t n, size_t *idx)
 {
 	char c;
 	size_t i;
 
 	for (i = 0; i < n - 1; i++) {
 		c = getchar(); /* TODO don't block output */
+		/* TODO no echo */
 
 		if (c == CTRL_L) {
 			printf("next channel\n");
+			(*idx)++; /* TODO check limit */
 			i--;
 			continue;
 		} /* TODO else */
 
 		if (c == CTRL_H) {
 			printf("prev channel\n");
+			*idx ? (*idx)-- : 0;
 			i--;
 			continue;
 		}
+
+		/* TODO check printable */
 
 		if (c == '\n')
 			c = '\0';
@@ -118,6 +122,7 @@ main(void)
 	size_t i;
 	char cmd[BUFSIZ];
 	char in[BUFSIZ];
+	size_t idx;
 
 	/* TODO refactor into parse_dirs() */
 	d = opendir("./"); /* TODO error checking */
@@ -140,7 +145,7 @@ main(void)
 
 		i++;
 	}
-	ch[0].selected = 1; /* TODO use index instead */
+	idx = 0;
 
 	/* TODO refactor */
 	non_canonical();
@@ -152,10 +157,10 @@ main(void)
 		system(cmd);
 		/* TODO use read() */
 
-		print_channels(ch);
+		print_channels(ch, idx);
 
 		printf("in: ");
-		get_input(in, sizeof(in));
+		get_input(in, sizeof(in), &idx);
 		if (in[0])
 			send_input(in, strlen(in), ch, 0);
 		/* TODO input don't block output */
