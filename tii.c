@@ -78,17 +78,20 @@ get_input(char *buf, size_t n, size_t *idx)
 		/* TODO no echo */
 
 		if (c == CTRL_L) {
-			printf("next channel\n");
 			(*idx)++; /* TODO check limit */
+			if (!i)
+				return;
 			i--;
 			continue;
 		} /* TODO else */
 
 		if (c == CTRL_H) {
-			printf("prev channel\n");
 			*idx ? (*idx)-- : 0;
+			if (!i)
+				return;
 			i--;
 			continue;
+			/* TODO better ctrl policy */
 		}
 
 		/* TODO check printable */
@@ -104,12 +107,12 @@ get_input(char *buf, size_t n, size_t *idx)
 }
 
 static void
-non_canonical(void)
+raw_term(void)
 {
 	struct termios attr;
 
 	tcgetattr(0, &attr); /* TODO no magic numbers */
-	attr.c_lflag &= ~ICANON;
+	attr.c_lflag &= ~(ICANON | ECHO);
 	tcsetattr(0, TCSANOW, &attr);
 }
 
@@ -148,7 +151,7 @@ main(void)
 	idx = 0;
 
 	/* TODO refactor */
-	non_canonical();
+	raw_term();
 	while (1) {
 		cmd[0] = '\0';
 		strcat(cmd, "tail -n24 ./"); /* TODO -n = ? */
