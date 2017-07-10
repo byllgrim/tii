@@ -82,19 +82,18 @@ get_input(char *buf, size_t n, size_t *idx)
 		c = getchar(); /* TODO don't block output */
 		/* TODO no echo */
 
-		if (c == CTRL_L) {
+		if (c == CTRL_L)
 			(*idx)++; /* TODO check limit */
-			if (!i)
-				return;
-			i--;
-			continue;
-		} /* TODO else */
 
-		if (c == CTRL_H) {
-			*idx ? (*idx)-- : 0;
-			if (!i)
+		if (c == CTRL_H)
+			*idx ? (*idx)-- : 0; /* TODO prettier */
+
+		if (c == CTRL_H || c == CTRL_L) {
+			if (!i) {
+				buf[0] = '\0';
 				return;
-			i--;
+			}
+			i = -1; /* TODO \0 */
 			continue;
 			/* TODO better ctrl policy */
 		}
