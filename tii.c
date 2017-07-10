@@ -1,4 +1,4 @@
-#define _DEFAULT_SOURCE /* TODO more conservative */
+#include <sys/stat.h>
 
 #include <ctype.h>
 #include <dirent.h>
@@ -7,6 +7,8 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+
+/* TODO unecessary includes */
 
 enum {
 	NAMELEN = 128,
@@ -45,7 +47,6 @@ send_input(char *msg, size_t n, struct channel *ch, size_t idx)
 
 	p[0] = '\0';
 	strcat(p, "./");
-	strcat(p, ch[0].name);
 	if (idx) {
 		strcat(p, "/");
 		strcat(p, ch[idx].name);
@@ -122,27 +123,30 @@ raw_term(void)
 static void
 parse_dirs(struct channel *ch) /* TODO rename */
 {
-	DIR *d;
+	DIR *d; /* TODO rename ds */
 	size_t i;
-	struct dirent *ds;
+	struct dirent *ds; /* TODO rename de */
+	struct stat sb;
 
 	d = opendir("./"); /* TODO error checking */
 	ch[0].name[0] = '\0';
 	for (i = 0; (ds = readdir(d)); ) {
-		if (ds->d_type != DT_DIR || ds->d_name[0] == '.')
+		stat(ds->d_name, &sb);
+		if (!S_ISDIR(sb.st_mode) || ds->d_name[0] == '.')
 			continue;
 
 		if (!ch[0].name[0]) {
 			strncpy(ch[0].name, ds->d_name, NAMELEN);
 			/* TODO null termination */
-			printf("server: %s\n", ch[0].name);
 			d = opendir(ch[0].name); /* TODO error checking */
+			chdir(ch[0].name); /* TODO no side-effects */
 		} else {
 			strncpy(ch[i].name, ds->d_name, NAMELEN);
 			/* TODO null termination */
 			/* TODO duplication */
-			printf("channel: %s\n", ch[i].name);
 		}
+
+		/* TODO handle DT_UNKNOWN */
 
 		i++;
 		/* TODO check if connected to channel */
@@ -166,7 +170,6 @@ main(void)
 	while (1) {
 		cmd[0] = '\0';
 		strcat(cmd, "tail -n24 ./"); /* TODO -n = ? */
-		strcat(cmd, ch[0].name);
 		if (idx) {
 			strcat(cmd, "/");
 			strcat(cmd, ch[idx].name);
