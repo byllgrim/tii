@@ -47,7 +47,7 @@ send_input(char *msg, size_t n, struct channel *ch, size_t idx)
 	char p[BUFSIZ]; /* TODO too big size */
 
 	p[0] = '\0';
-	strcat(p, "./");
+	strcat(p, ".");
 	if (idx) {
 		strcat(p, "/");
 		strcat(p, ch[idx].name);
@@ -68,7 +68,6 @@ send_input(char *msg, size_t n, struct channel *ch, size_t idx)
 	else
 		printf("boo\n");
 
-	fwrite("\n", 1, 1, f); /* TODO don't strip \n */
 	printf("sent '%s' to '%s'\n", msg, p);
 	fclose(f);
 }
@@ -77,38 +76,30 @@ static void
 handle_input(char *buf, size_t n, size_t *idx)
 {
 	char c;
-	size_t i;
 
-	for (i = 0; i < n - 1; i++) {
-		/* TODO don't wait if no input */
-		/* TODO loop many times; don't hang */
-		c = getchar(); /* TODO don't block output */
+	/* TODO don't wait if no input */
+	/* TODO loop many times; don't hang */
+	c = getchar(); /* TODO don't block output */
 
-		/* TODO ^D exit */
-		if (c == CTRL_L)
-			(*idx)++; /* TODO check limit */
+	/* TODO ^D exit */
+	if (c == CTRL_L)
+		(*idx)++; /* TODO check limit */
 
-		if (c == CTRL_H)
-			*idx ? (*idx)-- : 0; /* TODO prettier */
+	if (c == CTRL_H)
+		*idx ? (*idx)-- : 0; /* TODO prettier */
 
-		if (c == CTRL_H || c == CTRL_L) {
-			buf[0] = '\0';
-			return;
-			/* TODO better ctrl policy */
-		}
-
-		/* TODO check printable */
-
-		if (c == '\n')
-			c = '\0';
-
-		buf[i] = c;
-		if (isprint(c))
-			putchar(c);
-
-		if (c == '\0')
-			return; /* TODO better logic */
+	if (c == CTRL_H || c == CTRL_L) {
+		buf[0] = '\0';
+		return;
+		/* TODO better ctrl policy */
 	}
+
+	/* TODO check bounds */
+
+	/* TODO if strchr \n */
+
+	if (isprint(c) || isspace(c))
+		strncat(buf, &c, 1);
 }
 
 static void
@@ -175,7 +166,7 @@ int
 main(void)
 {
 	struct channel ch[MAXCHN] = {0};
-	char in[BUFSIZ];
+	char in[BUFSIZ] = {0};
 	size_t idx;
 	time_t t;
 
@@ -192,11 +183,16 @@ main(void)
 		print_out(ch, idx);
 		print_channels(ch, idx);
 
-		printf("in: ");
+		printf("in: %s", in);
 		handle_input(in, sizeof(in), &idx);
-		if (in[0])
+
+		if (strchr(in, '\n')) {
 			send_input(in, strlen(in), ch, idx);
+			memset(in, 0, BUFSIZ);
+		}
+
 		/* TODO input don't block output */
+		printf("\n"); /* TODO demonstrate more grace */
 	}
 
 	return 0;
