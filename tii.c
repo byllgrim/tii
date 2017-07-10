@@ -73,7 +73,7 @@ send_input(char *msg, size_t n, struct channel *ch, size_t idx)
 }
 
 static void
-get_input(char *buf, size_t n, size_t *idx)
+handle_input(char *buf, size_t n, size_t *idx)
 {
 	char c;
 	size_t i;
@@ -154,11 +154,26 @@ parse_dirs(struct channel *ch) /* TODO rename */
 	/* TODO close dir */
 }
 
+static void
+print_out(struct channel *ch, size_t idx)
+{
+	char cmd[BUFSIZ];
+
+	cmd[0] = '\0';
+	strcat(cmd, "tail -n24 ./"); /* TODO -n = ? */
+	if (idx) {
+		strcat(cmd, "/");
+		strcat(cmd, ch[idx].name);
+	}
+	strcat(cmd, "/out");
+	system(cmd);
+	/* TODO use read() */
+}
+
 int
 main(void)
 {
 	struct channel ch[MAXCHN] = {0};
-	char cmd[BUFSIZ];
 	char in[BUFSIZ];
 	size_t idx;
 
@@ -168,20 +183,11 @@ main(void)
 	/* TODO refactor */
 	raw_term();
 	while (1) {
-		cmd[0] = '\0';
-		strcat(cmd, "tail -n24 ./"); /* TODO -n = ? */
-		if (idx) {
-			strcat(cmd, "/");
-			strcat(cmd, ch[idx].name);
-		}
-		strcat(cmd, "/out");
-		system(cmd);
-		/* TODO use read() */
-
+		print_out(ch, idx);
 		print_channels(ch, idx);
 
 		printf("in: ");
-		get_input(in, sizeof(in), &idx);
+		handle_input(in, sizeof(in), &idx);
 		if (in[0])
 			send_input(in, strlen(in), ch, idx);
 		/* TODO input don't block output */
