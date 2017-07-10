@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <termios.h>
+#include <time.h>
 #include <unistd.h>
 
 /* TODO unecessary includes */
@@ -176,6 +177,7 @@ main(void)
 	struct channel ch[MAXCHN] = {0};
 	char in[BUFSIZ];
 	size_t idx;
+	time_t t;
 
 	parse_dirs(ch);
 	idx = 0;
@@ -183,6 +185,10 @@ main(void)
 	/* TODO refactor */
 	raw_term();
 	while (1) {
+		t = time(0);
+		while (!(time(0) - t))
+			;
+
 		print_out(ch, idx);
 		print_channels(ch, idx);
 
