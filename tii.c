@@ -1,5 +1,6 @@
 #define _DEFAULT_SOURCE /* TODO more conservative */
 
+#include <ctype.h>
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -89,12 +90,8 @@ get_input(char *buf, size_t n, size_t *idx)
 			*idx ? (*idx)-- : 0; /* TODO prettier */
 
 		if (c == CTRL_H || c == CTRL_L) {
-			if (!i) {
-				buf[0] = '\0';
-				return;
-			}
-			i = -1; /* TODO \0 */
-			continue;
+			buf[0] = '\0';
+			return;
 			/* TODO better ctrl policy */
 		}
 
@@ -104,6 +101,8 @@ get_input(char *buf, size_t n, size_t *idx)
 			c = '\0';
 
 		buf[i] = c;
+		if (isprint(c))
+			putchar(c);
 
 		if (c == '\0')
 			return; /* TODO better logic */
