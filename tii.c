@@ -81,8 +81,8 @@ get_input(char *buf, size_t n, size_t *idx)
 		/* TODO don't wait if no input */
 		/* TODO loop many times; don't hang */
 		c = getchar(); /* TODO don't block output */
-		/* TODO no echo */
 
+		/* TODO ^D exit */
 		if (c == CTRL_L)
 			(*idx)++; /* TODO check limit */
 
@@ -119,18 +119,13 @@ raw_term(void)
 	tcsetattr(0, TCSANOW, &attr);
 }
 
-int
-main(void)
+static void
+parse_dirs(struct channel *ch) /* TODO rename */
 {
 	DIR *d;
-	struct dirent *ds;
-	struct channel ch[MAXCHN] = {0};
 	size_t i;
-	char cmd[BUFSIZ];
-	char in[BUFSIZ];
-	size_t idx;
+	struct dirent *ds;
 
-	/* TODO refactor into parse_dirs() */
 	d = opendir("./"); /* TODO error checking */
 	ch[0].name[0] = '\0';
 	for (i = 0; (ds = readdir(d)); ) {
@@ -150,7 +145,20 @@ main(void)
 		}
 
 		i++;
+		/* TODO check if connected to channel */
 	}
+	/* TODO close dir */
+}
+
+int
+main(void)
+{
+	struct channel ch[MAXCHN] = {0};
+	char cmd[BUFSIZ];
+	char in[BUFSIZ];
+	size_t idx;
+
+	parse_dirs(ch);
 	idx = 0;
 
 	/* TODO refactor */
