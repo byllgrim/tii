@@ -2,6 +2,7 @@
 
 #include <ctype.h>
 #include <dirent.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -75,7 +76,15 @@ send_input(char *msg, size_t n, struct channel *ch, size_t idx)
 static void
 handle_input(char *buf, size_t n, size_t *idx)
 {
+	struct pollfd fds;
 	char c;
+
+	fds.fd = 0; /* TODO named stdin */
+	fds.events = POLLIN;
+	fds.revents = 0;
+	if (!poll(&fds, 1, 10)) /* TODO less magical numbers */
+		return;
+	/* TODO check POLLIN */
 
 	/* TODO don't wait if no input */
 	/* TODO loop many times; don't hang */
