@@ -38,7 +38,7 @@ print_channels(struct channel *ch, size_t idx) /* TODO assuming MAXCH */
 			       ch[i].name,
 			       ch[i].notify ? '*' : ' ');
 	}
-	puts("");
+	putchar('\n');
 }
 
 static void
@@ -74,7 +74,7 @@ send_input(char *msg, size_t n, struct channel *ch, size_t idx)
 }
 
 static void
-handle_input(char *buf, size_t n, size_t *idx)
+get_input(char *buf, size_t n, size_t *idx)
 {
 	struct pollfd fds;
 	char c;
@@ -108,7 +108,7 @@ handle_input(char *buf, size_t n, size_t *idx)
 	/* TODO if strchr \n */
 
 	if (isprint(c) || isspace(c))
-		strncat(buf, &c, 1);
+		strncat(buf, &c, 1); /* TODO use index */
 }
 
 static void
@@ -118,6 +118,7 @@ raw_term(void)
 
 	tcgetattr(0, &attr); /* TODO no magic numbers */
 	attr.c_lflag &= ~(ICANON | ECHO);
+	/* TODO sufficient with just setbuf */
 	tcsetattr(0, TCSANOW, &attr);
 }
 
@@ -184,24 +185,25 @@ main(void)
 
 	/* TODO refactor */
 	raw_term();
+	t = time(0);
+	setbuf(stdout, 0); /* TODO less hacky sollution to print order */
 	while (1) {
-		t = time(0);
-		while (!(time(0) - t))
-			;
+		if (time(0) - t) {
+			print_out(ch, idx);
+			print_channels(ch, idx);
+			t = time(0);
+		}
 
-		print_out(ch, idx);
-		print_channels(ch, idx);
-
+		fwrite("\r", sizeof(char), 1, stdout);
 		printf("in: %s", in);
-		handle_input(in, sizeof(in), &idx);
+		get_input(in, sizeof(in), &idx);
 
-		if (strchr(in, '\n')) {
+		if (strchr(in, '\n')) { /* TODO responsibility */
 			send_input(in, strlen(in), ch, idx);
 			memset(in, 0, BUFSIZ);
 		}
 
 		/* TODO input don't block output */
-		printf("\n"); /* TODO demonstrate more grace */
 	}
 
 	return 0;
