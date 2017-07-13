@@ -27,6 +27,7 @@ struct channel {
 static void
 print_channels(struct channel *ch, size_t idx) /* TODO assuming MAXCH */
 {
+	/* TODO possible to take array of known size? */
 	size_t i;
 
 	printf("ch: ");
@@ -38,6 +39,7 @@ print_channels(struct channel *ch, size_t idx) /* TODO assuming MAXCH */
 			       ch[i].name,
 			       ch[i].notify ? '*' : ' ');
 	}
+	/* TODO refresh output immediately */
 	putchar('\n');
 }
 
@@ -46,6 +48,9 @@ send_input(char *msg, size_t n, struct channel *ch, size_t idx)
 {
 	FILE *f;
 	char p[BUFSIZ]; /* TODO too big size */
+
+	/* TODO refactor and clean */
+	/* TODO check bounds of n */
 
 	p[0] = '\0';
 	strcat(p, ".");
@@ -69,7 +74,6 @@ send_input(char *msg, size_t n, struct channel *ch, size_t idx)
 	else
 		printf("boo\n");
 
-	printf("sent '%s' to '%s'\n", msg, p);
 	fclose(f);
 }
 
@@ -91,6 +95,7 @@ get_input(char *buf, size_t n, size_t *idx)
 	c = getchar(); /* TODO don't block output */
 
 	/* TODO ^D exit */
+	/* TODO what if overflowing terminal width? */
 	if (c == CTRL_L)
 		(*idx)++; /* TODO check limit */
 
@@ -194,13 +199,13 @@ main(void)
 			t = time(0);
 		}
 
-		fwrite("\r", sizeof(char), 1, stdout);
-		printf("in: %s", in);
+		fwrite("\r", sizeof(char), 1, stdout); /* TODO check return */
+		printf("in: %s", in); /* TODO check return */
 		get_input(in, sizeof(in), &idx);
 
 		if (strchr(in, '\n')) { /* TODO responsibility */
 			send_input(in, strlen(in), ch, idx);
-			memset(in, 0, BUFSIZ);
+			memset(in, 0, BUFSIZ); /* TODO check return */
 		}
 
 		/* TODO input don't block output */
