@@ -16,7 +16,8 @@ enum {
 	NAMELEN = 128,
 	MAXCHN = 16,
 	CTRL_L = 0xC, /* TODO use '^L' */
-	CTRL_H = 0x8
+	CTRL_H = 0x8,
+	BCKSP = 0x7f
 };
 
 struct channel {
@@ -106,6 +107,12 @@ get_input(char *buf, size_t n, size_t *i, size_t *chi)
 		buf[0] = '\0';
 		return;
 		/* TODO better ctrl policy */
+	}
+
+	if (c == BCKSP) {
+		(*i) ?  buf[--(*i)] = '\0' : 0; /* TODO less cryptic */
+		/* TODO check all edge cases */
+		return;
 	}
 
 	if (*i >= n - 2) /* TODO better bounds */
