@@ -10,8 +10,6 @@
 #include <time.h>
 #include <unistd.h>
 
-/* TODO unecessary includes */
-
 enum {
 	NAMELEN = 128,
 	MAXCHN = 16,
@@ -79,22 +77,20 @@ send_input(char *msg, size_t n, struct channel *ch, size_t chi)
 }
 
 static void
-get_input(char *buf, size_t n, size_t *i, size_t *chi) /* TODO rename */
+handle_input(char *buf, size_t n, size_t *i, size_t *chi)
 {
 	struct pollfd fds = {0};
 	char c;
 
 	/* TODO define a SINGLE responsibility for this function! */
 
-	fds.fd = 0; /* TODO STDIN_FILENO */
+	fds.fd = STDIN_FILENO;
 	fds.events = POLLIN;
 	if (!poll(&fds, 1, 10)) /* TODO less magical numbers */
 		return;
 	/* TODO check POLLIN */
 
-	/* TODO don't wait if no input */
-	/* TODO loop many times; don't hang */
-	c = getchar(); /* TODO don't block output */
+	c = getchar();
 
 	/* TODO ^D exit */
 	/* TODO what if overflowing terminal width? */
@@ -102,7 +98,7 @@ get_input(char *buf, size_t n, size_t *i, size_t *chi) /* TODO rename */
 		(*chi)++; /* TODO check limit */
 
 	if (c == CTRL_H)
-		*chi ? (*chi)-- : 0; /* TODO prettier */
+		*chi ? (*chi)-- : 0; /* TODO prettier expression */
 
 	if (c == CTRL_H || c == CTRL_L) {
 		buf[0] = '\0';
@@ -116,7 +112,7 @@ get_input(char *buf, size_t n, size_t *i, size_t *chi) /* TODO rename */
 		return;
 	}
 
-	/* TODO check if buf is only blanks */
+	/* TODO check if buf is only blanks before sending */
 	if (c == '\n' && !(*i)) /* TODO handle in send function? */
 		return;
 
@@ -131,10 +127,10 @@ raw_term(void)
 {
 	struct termios attr;
 
-	tcgetattr(0, &attr); /* TODO no magic numbers */
+	tcgetattr(STDIN_FILENO, &attr);
 	attr.c_lflag &= ~(ICANON | ECHO);
 	/* TODO sufficient with just setbuf */
-	tcsetattr(0, TCSANOW, &attr);
+	tcsetattr(STDIN_FILENO, TCSANOW, &attr);
 }
 
 static void
@@ -168,7 +164,7 @@ parse_dirs(struct channel *ch) /* TODO rename */
 		i++;
 		/* TODO check if connected to channel */
 	}
-	/* TODO close dir */
+	closedir(ds); /* TODO check error */
 }
 
 static void
@@ -176,7 +172,7 @@ print_out(struct channel *ch, size_t chi)
 {
 	char cmd[BUFSIZ] = {0}; /* TODO better to be safe than sorry? */
 
-	strcat(cmd, "tail -n24 ./"); /* TODO -n = ? */
+	strcat(cmd, "tail -n24 ./"); /* TODO -n argument */
 	/* TODO use strncat or index */
 	if (chi) {
 		strcat(cmd, "/");
@@ -210,7 +206,7 @@ main(void)
 
 		fwrite("\r", sizeof(char), 1, stdout); /* TODO check return */
 		printf("in: %s", in); /* TODO check return */
-		get_input(in, sizeof(in), &i, &chi);
+		handle_input(in, sizeof(in), &i, &chi);
 
 		if (strchr(in, '\n')) { /* TODO responsibility */
 			send_input(in, strlen(in), ch, chi);
@@ -218,9 +214,7 @@ main(void)
 			memset(in, 0, BUFSIZ); /* TODO check return */
 			/* TODO is memset necessary? */
 		}
-
-		/* TODO input don't block output */
 	}
 
-	return 0;
+	return EXIT_SUCCESS;
 }
