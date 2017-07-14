@@ -78,7 +78,7 @@ send_input(char *msg, size_t n, struct channel *ch, size_t chi)
 }
 
 static void
-get_input(char *buf, size_t n, size_t *chi)
+get_input(char *buf, size_t n, size_t *i, size_t *chi)
 {
 	struct pollfd fds;
 	char c;
@@ -108,12 +108,10 @@ get_input(char *buf, size_t n, size_t *chi)
 		/* TODO better ctrl policy */
 	}
 
-	/* TODO check bounds */
-
-	/* TODO if strchr \n */
-
-	if (isprint(c) || isspace(c))
-		strncat(buf, &c, 1); /* TODO use index */
+	if (*i >= n - 2) /* TODO better bounds */
+		buf[n - 2] = c = '\n'; /* TODO too many assignments */
+	else if (isprint(c) || isspace(c))
+		buf[(*i)++] = c; /* TODO too complex expression */
 }
 
 static void
@@ -182,8 +180,9 @@ main(void)
 {
 	struct channel ch[MAXCHN] = {0};
 	char in[BUFSIZ] = {0};
-	size_t chi;
-	time_t t;
+	size_t chi = 0;
+	time_t t = 0;
+	size_t i = 0; /* TODO single responsibility */
 
 	parse_dirs(ch);
 	chi = 0;
@@ -201,11 +200,13 @@ main(void)
 
 		fwrite("\r", sizeof(char), 1, stdout); /* TODO check return */
 		printf("in: %s", in); /* TODO check return */
-		get_input(in, sizeof(in), &chi);
+		get_input(in, sizeof(in), &i, &chi);
 
 		if (strchr(in, '\n')) { /* TODO responsibility */
 			send_input(in, strlen(in), ch, chi);
+			i = 0;
 			memset(in, 0, BUFSIZ); /* TODO check return */
+			/* TODO is memset necessary? */
 		}
 
 		/* TODO input don't block output */
