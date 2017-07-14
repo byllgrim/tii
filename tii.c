@@ -79,10 +79,12 @@ send_input(char *msg, size_t n, struct channel *ch, size_t chi)
 }
 
 static void
-get_input(char *buf, size_t n, size_t *i, size_t *chi)
+get_input(char *buf, size_t n, size_t *i, size_t *chi) /* TODO rename */
 {
 	struct pollfd fds;
 	char c;
+
+	/* TODO define a SINGLE responsibility for this function! */
 
 	fds.fd = 0; /* TODO named stdin */
 	fds.events = POLLIN;
@@ -114,6 +116,10 @@ get_input(char *buf, size_t n, size_t *i, size_t *chi)
 		/* TODO check all edge cases */
 		return;
 	}
+
+	/* TODO check if buf is only blanks */
+	if (c == '\n' && !(*i)) /* TODO handle in send function? */
+		return;
 
 	if (*i >= n - 2) /* TODO better bounds */
 		buf[n - 2] = c = '\n'; /* TODO too many assignments */
