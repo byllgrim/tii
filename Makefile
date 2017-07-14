@@ -1,7 +1,8 @@
 TARG = tii
 SRC = ${TARG}.c
 OBJ = ${SRC:.c=.o}
-CFLAGS = -Os -pedantic -std=c89 -Wall -Wextra
+CPPFLAGS = -D_POSIX_C_SOURCE=200112L
+CFLAGS = -Os -pedantic -std=c89 -Wall -Wextra ${CPPFLAGS}
 LDFLAGS  = -s
 PREFIX = /usr/local
 
