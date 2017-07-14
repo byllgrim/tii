@@ -48,12 +48,12 @@ static void
 send_input(char *msg, size_t n, struct channel *ch, size_t chi)
 {
 	FILE *f;
-	char p[BUFSIZ]; /* TODO too big size */
+	char p[BUFSIZ] = {0}; /* TODO better safe than sorry? */
+	/* TODO BUFSIZ is too big */
 
 	/* TODO refactor and clean */
 	/* TODO check bounds of n */
 
-	p[0] = '\0';
 	strcat(p, ".");
 	if (chi) {
 		strcat(p, "/");
@@ -81,14 +81,13 @@ send_input(char *msg, size_t n, struct channel *ch, size_t chi)
 static void
 get_input(char *buf, size_t n, size_t *i, size_t *chi) /* TODO rename */
 {
-	struct pollfd fds;
+	struct pollfd fds = {0};
 	char c;
 
 	/* TODO define a SINGLE responsibility for this function! */
 
-	fds.fd = 0; /* TODO named stdin */
+	fds.fd = 0; /* TODO STDIN_FILENO */
 	fds.events = POLLIN;
-	fds.revents = 0;
 	if (!poll(&fds, 1, 10)) /* TODO less magical numbers */
 		return;
 	/* TODO check POLLIN */
@@ -175,17 +174,17 @@ parse_dirs(struct channel *ch) /* TODO rename */
 static void
 print_out(struct channel *ch, size_t chi)
 {
-	char cmd[BUFSIZ];
+	char cmd[BUFSIZ] = {0}; /* TODO better to be safe than sorry? */
 
-	cmd[0] = '\0';
 	strcat(cmd, "tail -n24 ./"); /* TODO -n = ? */
+	/* TODO use strncat or index */
 	if (chi) {
 		strcat(cmd, "/");
 		strcat(cmd, ch[chi].name);
 	}
 	strcat(cmd, "/out");
 	system(cmd);
-	/* TODO use read() */
+	/* TODO use read() and select() */
 }
 
 int
@@ -194,15 +193,13 @@ main(void)
 	struct channel ch[MAXCHN] = {0};
 	char in[BUFSIZ] = {0};
 	size_t chi = 0;
-	time_t t = 0;
+	time_t t = time(0);
 	size_t i = 0; /* TODO single responsibility */
 
 	parse_dirs(ch);
-	chi = 0;
 
 	/* TODO refactor */
 	raw_term();
-	t = time(0);
 	setbuf(stdout, 0); /* TODO less hacky sollution to print order */
 	while (1) {
 		if (time(0) - t) {
