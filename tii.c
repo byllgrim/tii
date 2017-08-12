@@ -17,6 +17,7 @@ enum {
 	MAXCHN = 32,
 	CTRL_L = 0xC, /* TODO use '^L' */
 	CTRL_H = 0x8,
+	/* TODO ^J ^K ^U */
 	BCKSP = 0x7f
 };
 
@@ -149,53 +150,17 @@ raw_term(void)
 }
 
 static void
-parse_dirs(struct channel *ch) /* TODO rename */
+print_out(struct server *srv)
 {
-	DIR *ds;
-	size_t i;
-	struct dirent *de;
-	struct stat sb;
-
-	ds = opendir("./"); /* TODO error checking */
-	ch[0].name[0] = '\0';
-	for (i = 0; (de = readdir(ds)); ) {
-		stat(de->d_name, &sb);
-		if (!S_ISDIR(sb.st_mode) || de->d_name[0] == '.')
-			continue;
-
-		if (!ch[0].name[0]) {
-			strncpy(ch[0].name, de->d_name, NAMELEN);
-			/* TODO null termination */
-			ds = opendir(ch[0].name); /* TODO error checking */
-			chdir(ch[0].name); /* TODO no side-effects */
-		} else {
-			strncpy(ch[i].name, de->d_name, NAMELEN);
-			/* TODO null termination */
-			/* TODO duplication */
-		}
-
-		/* TODO handle DT_UNKNOWN */
-
-		i++;
-		/* TODO check if connected to channel */
-	}
-	closedir(ds); /* TODO check error */
+	printf("TODO print_out\n");
 }
 
 static void
-print_out(struct channel *ch, size_t chi)
+init_server(struct server *srv, char *name)
 {
-	char cmd[BUFSIZ] = {0}; /* TODO better to be safe than sorry? */
-
-	strcat(cmd, "tail -n24 ./"); /* TODO -n argument */
-	/* TODO use strncat or index */
-	if (chi) {
-		strcat(cmd, "/");
-		strcat(cmd, ch[chi].name);
-	}
-	strcat(cmd, "/out");
-	system(cmd);
-	/* TODO use read() and select() */
+	strncpy(srv->name, name, sizeof(srv->name));
+	srv->chs[0].name[0] = '.';
+	srv->i = 0;
 }
 
 static void
@@ -205,8 +170,8 @@ add_server(struct server *svs, size_t n, char *name)
 
 	for (i = 0; i < n; i++) {
 		if (svs[i].name[0] == 0) {
-			strncpy(svs[i].name, name, sizeof(svs[i].name));
 			printf("found server %s\n", name);
+			init_server(&svs[i], name);
 			return;
 		}
 
@@ -216,16 +181,12 @@ add_server(struct server *svs, size_t n, char *name)
 }
 
 static int
-isdir(struct dirent *de)
+is_dir(struct dirent *de)
 {
 	struct stat sb;
 
-	errno = 0;
-	stat(de->d_name, &sb);
-	if (errno) {
-		fprintf(stderr, "%s: %s\n", de->d_name, strerror(errno));
-		die("isdir: error on stat()\n");
-	}
+	if (stat(de->d_name, &sb) < 0)
+		die("is_dir: error on stat()\n");
 
 	return S_ISDIR(sb.st_mode);
 }
@@ -244,7 +205,7 @@ find_servers(struct server *svs, size_t n)
 
 	errno = 0;
 	while ((de = readdir(ds))) {
-		if (isdir(de) && de->d_name[0] != '.')
+		if (is_dir(de) && de->d_name[0] != '.')
 			add_server(svs, n, de->d_name);
 	}
 	if (errno)
@@ -289,7 +250,7 @@ find_channels(struct server *srv)
 	/* TODO dry from find_servers */
 	errno = 0;
 	while ((de = readdir(ds))) {
-		if (isdir(de) && de->d_name[0] != '.')
+		if (is_dir(de) && de->d_name[0] != '.')
 			add_channel(srv, de->d_name);
 	}
 	if (errno)
@@ -308,13 +269,11 @@ main(void)
 	size_t chi = 0;
 	time_t t = time(0);
 	size_t i;
+	size_t cursrv = 0;
 
 	find_servers(servers, MAXSRV);
 	for (i = 0; i < MAXSRV && servers[i].name[0]; i++)
 		find_channels(&servers[i]);
-return 0;
-
-	parse_dirs(ch);
 
 	/* TODO refactor */
 	raw_term();
@@ -322,7 +281,7 @@ return 0;
 	i = 0;
 	while (1) {
 		if (time(0) - t) {
-			print_out(ch, chi);
+			print_out(&servers[cursrv]);
 			print_channels(ch, chi);
 			t = time(0);
 		}
