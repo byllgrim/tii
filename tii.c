@@ -2,6 +2,7 @@
 
 #include <ctype.h>
 #include <dirent.h>
+#include <errno.h>
 #include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,7 +13,8 @@
 
 enum {
 	NAMELEN = 128,
-	MAXCHN = 16,
+	MAXSRV = 16,
+	MAXCHN = 32,
 	CTRL_L = 0xC, /* TODO use '^L' */
 	CTRL_H = 0x8,
 	BCKSP = 0x7f
@@ -20,8 +22,21 @@ enum {
 
 struct channel {
 	char name[NAMELEN];
-	int notify;
+	int notify; /* TODO char? */
 };
+
+struct server {
+	char name[NAMELEN];
+	struct channel chs[MAXCHN];
+	size_t i;
+};
+
+static void
+die(char *msg)
+{
+	fputs(msg, stderr);
+	exit(EXIT_FAILURE);
+}
 
 static void
 print_channels(struct channel *ch, size_t chi) /* TODO assuming MAXCH */
@@ -183,14 +198,62 @@ print_out(struct channel *ch, size_t chi)
 	/* TODO use read() and select() */
 }
 
+static void
+add_server(struct server *svs, size_t n, char *name)
+{
+	size_t i;
+
+	for (i = 0; i < n; i++) {
+		if (svs[i].name[0] == 0) {
+			strncpy(svs[i].name, name, sizeof(svs[i].name));
+			return;
+		}
+
+		if (!strncmp(svs[i].name, name, sizeof(svs[i].name)))
+			return;
+	}
+}
+
+static int
+isdir(struct dirent *de)
+{
+	struct stat sb;
+
+	stat(de->d_name, &sb);
+
+	return S_ISDIR(sb.st_mode);
+}
+
+static void
+find_servers(struct server *svs, size_t n)
+{
+	DIR *ds;
+	struct dirent *de;
+
+	ds = opendir(".");
+	if (!ds)
+		die("find_servers: failed to open irc directory");
+
+	errno = 0;
+	while ((de = readdir(ds))) {
+		if (isdir(de) && de->d_name[0] != '.')
+			add_server(svs, n, de->d_name);
+	}
+	if (errno)
+		die("find_servers: error reading directory entries");
+}
+
 int
 main(void)
 {
+	struct server servers[MAXSRV] = {0};
 	struct channel ch[MAXCHN] = {0};
 	char in[BUFSIZ] = {0};
 	size_t chi = 0;
 	time_t t = time(0);
 	size_t i = 0; /* TODO single responsibility */
+
+	find_servers(servers, MAXSRV);
 
 	parse_dirs(ch);
 
