@@ -206,6 +206,7 @@ add_server(struct server *svs, size_t n, char *name)
 	for (i = 0; i < n; i++) {
 		if (svs[i].name[0] == 0) {
 			strncpy(svs[i].name, name, sizeof(svs[i].name));
+			printf("found server %s\n", name);
 			return;
 		}
 
@@ -219,7 +220,12 @@ isdir(struct dirent *de)
 {
 	struct stat sb;
 
+	errno = 0;
 	stat(de->d_name, &sb);
+	if (errno) {
+		fprintf(stderr, "%s: %s\n", de->d_name, strerror(errno));
+		die("isdir: error on stat()\n");
+	}
 
 	return S_ISDIR(sb.st_mode);
 }
@@ -230,9 +236,11 @@ find_servers(struct server *svs, size_t n)
 	DIR *ds;
 	struct dirent *de;
 
+	printf("scanning for irc servers\n");
+
 	ds = opendir(".");
 	if (!ds)
-		die("find_servers: failed to open irc directory");
+		die("find_servers: failed to open irc directory\n");
 
 	errno = 0;
 	while ((de = readdir(ds))) {
@@ -240,7 +248,55 @@ find_servers(struct server *svs, size_t n)
 			add_server(svs, n, de->d_name);
 	}
 	if (errno)
-		die("find_servers: error reading directory entries");
+		die("find_servers: error reading directory entries\n");
+
+	closedir(ds);
+}
+
+static void
+add_channel(struct server *srv, char *name)
+{
+	size_t i;
+	struct channel *chs = srv->chs;
+
+	for (i = 0; i < sizeof(srv->chs); i++) {
+		if (chs[i].name[0] == 0) {
+			strncpy(chs[i].name, name, sizeof(chs[i].name));
+			printf("adding %s to %s\n", name, srv->name);
+			return;
+		}
+
+		if (!strncmp(chs[i].name, name, sizeof(chs[i].name)))
+			return;
+	}
+}
+
+static void
+find_channels(struct server *srv)
+{
+	DIR *ds;
+	struct dirent *de;
+
+	printf("scanning for channels in %s\n", srv->name);
+
+	ds = opendir(srv->name);
+	if (!ds)
+		die("find_channels: failed to open server directory\n");
+
+	if (chdir(srv->name) < 0)
+		die("find_channels: can't chdir\n");
+
+	/* TODO dry from find_servers */
+	errno = 0;
+	while ((de = readdir(ds))) {
+		if (isdir(de) && de->d_name[0] != '.')
+			add_channel(srv, de->d_name);
+	}
+	if (errno)
+		die("find_channels: error reading directory entries\n");
+
+	chdir(".."); /* TODO getcwd() */
+	closedir(ds);
 }
 
 int
@@ -251,15 +307,19 @@ main(void)
 	char in[BUFSIZ] = {0};
 	size_t chi = 0;
 	time_t t = time(0);
-	size_t i = 0; /* TODO single responsibility */
+	size_t i;
 
 	find_servers(servers, MAXSRV);
+	for (i = 0; i < MAXSRV && servers[i].name[0]; i++)
+		find_channels(&servers[i]);
+return 0;
 
 	parse_dirs(ch);
 
 	/* TODO refactor */
 	raw_term();
 	setbuf(stdout, 0); /* TODO less hacky sollution to print order */
+	i = 0;
 	while (1) {
 		if (time(0) - t) {
 			print_out(ch, chi);
