@@ -43,19 +43,20 @@ die(char *msg)
 }
 
 static void
-print_channels(struct channel *ch, size_t chi) /* TODO assuming MAXCH */
+print_channels(struct server *srv)
 {
-	/* TODO possible to take array of known size? */
 	size_t i;
 
+	/* TODO don't print when theres no change */
+
 	printf("ch: ");
-	for (i = 0; i < MAXCHN; i++) {
-		if (i == chi)
-			printf("[%s]", ch[i].name);
+	for (i = 0; i < MAXCHN && srv->chs[i].name[0]; i++) {
+		if (i == srv->i)
+			printf("[%s]", srv->name);
 		else
 			printf(" %s%c",
-			       ch[i].name,
-			       ch[i].notify ? '*' : ' ');
+			       srv->chs[i].name,
+			       srv->chs[i].notify ? '*' : ' ');
 	}
 	/* TODO refresh output immediately */
 	putchar('\n');
@@ -322,7 +323,7 @@ main(void)
 	for (;;) {
 		if (time(0) - t) {
 			print_out(&servers[cursrv]);
-			print_channels(ch, chi);
+			print_channels(&servers[cursrv]);
 			t = time(0);
 		}
 
