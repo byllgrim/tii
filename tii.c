@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,7 +19,9 @@ enum {
 	CTRL_L = 0xC, /* TODO use '^L' */
 	CTRL_H = 0x8,
 	/* TODO ^J ^K ^U */
-	BCKSP = 0x7f
+	BCKSP = 0x7f,
+	ROWS = 24,
+	COLS = 80
 };
 
 struct channel {
@@ -150,9 +153,46 @@ raw_term(void)
 }
 
 static void
+print_tail(int fd)
+{
+	off_t pos;
+	char buf[BUFSIZ];
+	size_t n;
+
+	pos = lseek(fd, 0, SEEK_END);
+
+	pos -= ROWS*COLS;
+	if (pos < 0)
+		pos = 0;
+	lseek(fd, pos, SEEK_SET);
+
+	for (; (n = read(fd, buf, sizeof(buf))); )
+		write(STDOUT_FILENO, buf, n);
+}
+
+static void
 print_out(struct server *srv)
 {
-	printf("TODO print_out\n");
+	char cwd[BUFSIZ];
+	int out;
+
+	if (!getcwd(cwd, sizeof(cwd)))
+		die("print_out: failed to get cwd\n");
+
+	errno = 0;
+	chdir(srv->name);
+	chdir(srv->chs[srv->i].name);
+	if (errno) /* TODO not all under same comb? */
+		die("print_out: failed to cd into channel\n");
+
+	out = open("out", O_RDONLY); /* TODO mode */
+	if (out < 0)
+		die("print_out: failed to open 'out' file\n");
+
+	print_tail(out);
+
+	close(out);
+	chdir(cwd);
 }
 
 static void
