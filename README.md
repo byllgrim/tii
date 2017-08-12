@@ -1,6 +1,8 @@
 # tii
 An interface for irc it (ii)
 
+Work in progress (WIP)!
+
 Dependencies:
 C89, posix.1 2001, [ii](http://git.suckless.org/ii).
 
@@ -9,9 +11,3 @@ Usage:
 The `out` file will be shown in terminal, along with the selected channel, and
 an input line at the bottom.
 Next channel ^L, prev channel ^H.
-
-Notes:
-This is lazily written.
-I've rejected malloc.
-I've rejected global state.
-I've experimented with semi-strange ideas.
