@@ -204,7 +204,7 @@ find_servers(struct server *svs, size_t n)
 		die("find_servers: failed to open irc directory\n");
 
 	errno = 0;
-	while ((de = readdir(ds))) {
+	for (; (de = readdir(ds)); ) {
 		if (is_dir(de) && de->d_name[0] != '.')
 			add_server(svs, n, de->d_name);
 	}
@@ -249,7 +249,7 @@ find_channels(struct server *srv)
 
 	/* TODO dry from find_servers */
 	errno = 0;
-	while ((de = readdir(ds))) {
+	for (; (de = readdir(ds)); ) {
 		if (is_dir(de) && de->d_name[0] != '.')
 			add_channel(srv, de->d_name);
 	}
@@ -279,7 +279,7 @@ main(void)
 	raw_term();
 	setbuf(stdout, 0); /* TODO less hacky sollution to print order */
 	i = 0;
-	while (1) {
+	for (;;) {
 		if (time(0) - t) {
 			print_out(&servers[cursrv]);
 			print_channels(ch, chi);
