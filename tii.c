@@ -295,7 +295,6 @@ add_server(struct server *svs, size_t n, char *name)
 
 	for (i = 0; i < n; i++) {
 		if (svs[i].name[0] == 0) {
-			printf("found server %s\n", name);
 			init_server(&svs[i], name);
 			return;
 		}
@@ -311,11 +310,8 @@ is_dir(struct dirent *de)
 	struct stat sb;
 
 	if (stat(de->d_name, &sb) < 0) {
-		fprintf(stderr,
-		        "is_dir: %s %s\n",
-		        de->d_name,
-			strerror(errno));
 		die("is_dir: error on stat()\n");
+		/* TODO more info */
 	}
 
 	return S_ISDIR(sb.st_mode);
@@ -326,8 +322,6 @@ find_servers(struct server *svs, size_t n)
 {
 	DIR *ds;
 	struct dirent *de;
-
-	printf("scanning for irc servers\n");
 
 	ds = opendir(".");
 	if (!ds)
@@ -354,7 +348,6 @@ add_channel(struct server *srv, char *name)
 	len = sizeof(srv->chs) / sizeof(*srv->chs);
 	for (i = 0; i < len; i++) {
 		if (chs[i].name[0] == 0) {
-			printf("adding %s to %s\n", name, srv->name);
 			init_channel(srv, i, name);
 			return;
 		}
@@ -369,8 +362,6 @@ find_channels(struct server *srv)
 {
 	DIR *ds;
 	struct dirent *de;
-
-	printf("scanning for channels in %s\n", srv->name);
 
 	ds = opendir(srv->name);
 	if (!ds)
@@ -411,18 +402,16 @@ print_ch_tree(struct server *svs, size_t n)
 int
 main(void)
 {
-	size_t i;
 	struct server servers[MAXSRV] = {0};
 	size_t cursrv = 0;
 	struct inbuf in = {0};
 
 	find_servers(servers, sizeof(servers)/sizeof(*servers));
-	for (i = 0; i < MAXSRV && servers[i].name[0]; i++)
-		find_channels(&servers[i]);
 	print_ch_tree(servers, sizeof(servers)/sizeof(*servers));
 
 	raw_term();
 	for (;;) {
+		find_channels(&servers[cursrv]);
 		print_outputs(&servers[cursrv], in.txt);
 		handle_input(&servers[cursrv], &in);
 		/* TODO periodically check (dis)connections */
