@@ -1,10 +1,8 @@
 # tii
-An interface for irc it (ii)
-
-Work in progress (WIP)!
+A terminal/text interface for [ii](http://git.suckless.org/ii)
 
 Dependencies:
-C89, posix.1 2001, [ii](http://git.suckless.org/ii).
+C89, posix.1 2001, ii.
 
 Usage:
 `cd` into the `irc` directory and launch `tii`.
