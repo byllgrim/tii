@@ -17,7 +17,8 @@ enum {
 	MAXCHN = 32,
 	CTRL_L = 0xC, /* TODO use '^L' */
 	CTRL_H = 0x8,
-	/* TODO ^J ^K ^U ^D */
+	CTRL_U = 0x15,
+	/* TODO ^J ^K ^D */
 	BCKSP = 0x7f,
 	ROWS = 24,
 	COLS = 80
@@ -68,6 +69,13 @@ print_channels(struct server *srv)
 }
 
 static void
+clear_input(struct inbuf *in)
+{
+	in->i = 0;
+	memset(in->txt, '\0', sizeof(in->txt));
+}
+
+static void
 send_input(struct server *srv, struct inbuf *in)
 {
 	char cwd[BUFSIZ];
@@ -98,8 +106,7 @@ send_input(struct server *srv, struct inbuf *in)
 		die("send_input: transmission failed\n");
 
 exit:
-	in->i = 0;
-	memset(in->txt, '\0', sizeof(in->txt));
+	clear_input(in);
 
 	chdir(cwd);
 	close(fd);
@@ -169,6 +176,8 @@ handle_input(struct server *srv, struct inbuf *in)
 	c = getchar();
 	if (c == CTRL_H || c == CTRL_L)
 		handle_selection(srv, in, c);
+	else if (c == CTRL_U)
+		clear_input(in);
 	else if (c == BCKSP)
 		handle_backspace(srv, in);
 	else if (c == '\n' && in->i)
@@ -470,7 +479,6 @@ main(void)
 		find_channels(&servers[cursrv]);
 		print_outputs(&servers[cursrv], in.txt);
 		handle_input(&servers[cursrv], &in);
-		/* TODO periodically check (dis)connections */
 	}
 
 	return EXIT_SUCCESS; /* TODO not reachable */
