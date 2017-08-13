@@ -171,9 +171,43 @@ print_tail(int fd)
 		write(STDOUT_FILENO, buf, n);
 }
 
+int
+read_ready(int fd)
+{
+	off_t cur;
+	off_t end;
+
+	cur = lseek(fd, 0, SEEK_CUR);
+	if (cur < 0)
+		die("error seeking in file\n");
+
+	end = lseek(fd, 0, SEEK_END);
+
+	lseek(fd, cur, SEEK_SET);
+	return end - cur;
+}
+
+static void
+poll_outputs(struct server *srv)
+{
+	size_t i;
+	size_t len;
+
+	/* TODO poll all servers */
+
+	len = sizeof(srv->chs) / sizeof(*srv->chs);
+	for (i = 0; i < len && srv->chs[i].name[0]; i++)
+		srv->chs[i].notify = read_ready(srv->chs[i].out);
+}
+
 static void
 print_outputs(struct server *srv)
 {
+	poll_outputs(srv);
+	if (srv->chs[srv->i].notify) {
+		print_tail(srv->chs[srv->i].out);
+		print_channels(srv);
+	}
 }
 
 static void
@@ -311,35 +345,6 @@ find_channels(struct server *srv)
 	closedir(ds);
 }
 
-int
-read_ready(int fd)
-{
-	off_t cur;
-	off_t end;
-
-	cur = lseek(fd, 0, SEEK_CUR);
-	if (cur < 0)
-		die("error seeking in file\n");
-
-	end = lseek(fd, 0, SEEK_END);
-
-	lseek(fd, cur, SEEK_SET);
-	return end - cur;
-}
-
-static void
-poll_outputs(struct server *srv)
-{
-	size_t i;
-	size_t len;
-
-	/* TODO poll all servers */
-
-	len = sizeof(srv->chs) / sizeof(*srv->chs);
-	for (i = 0; i < len && srv->chs[i].name[0]; i++)
-		srv->chs[i].notify = read_ready(srv->chs[i].out);
-}
-
 static void
 print_ch_tree(struct server *svs, size_t n)
 {
@@ -375,11 +380,7 @@ main(void)
 
 	/* TODO refactor */
 	for (i = 0; 1; ) {
-		poll_outputs(&servers[cursrv]);
-		if (servers[cursrv].chs[servers[cursrv].i].notify) {
-			print_tail(servers[cursrv].chs[servers[cursrv].i].out);
-			print_channels(&servers[cursrv]);
-		}
+		print_outputs(&servers[cursrv]);
 		getchar();
 		continue;
 
