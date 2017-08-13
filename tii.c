@@ -4,12 +4,11 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <poll.h>
+#include <poll.h> /* TODO remove */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <termios.h>
-#include <time.h>
 #include <unistd.h>
 
 enum {
@@ -34,7 +33,6 @@ struct server {
 	char name[NAMELEN];
 	struct channel chs[MAXCHN];
 	size_t i;
-	struct pollfd fds[MAXCHN];
 };
 
 static void
@@ -176,26 +174,6 @@ print_tail(int fd)
 static void
 print_outputs(struct server *srv)
 {
-	char cwd[BUFSIZ];
-	int out;
-
-	if (!getcwd(cwd, sizeof(cwd)))
-		die("print_outputs: failed to get cwd\n");
-
-	errno = 0;
-	chdir(srv->name);
-	chdir(srv->chs[srv->i].name);
-	if (errno) /* TODO not all under same comb? */
-		die("print_outputs: failed to cd into channel\n");
-
-	out = open("out", O_RDONLY); /* TODO mode */
-	if (out < 0)
-		die("print_outputs: failed to open 'out' file\n");
-
-	print_tail(out);
-
-	close(out);
-	chdir(cwd);
 }
 
 static void
@@ -216,24 +194,12 @@ init_channel(struct server *srv, size_t i, char *name)
 		die("init_channel: failed to open 'out' file\n");
 		/* TODO descriptive err msg */
 	chdir(cwd);
-
-	srv->fds[i].fd = srv->chs[i].out;
 }
 
 static void
 init_server(struct server *srv, char *name)
 {
-	size_t i;
-	size_t len;
-
 	strncpy(srv->name, name, sizeof(srv->name));
-
-	len = sizeof(srv->fds) / sizeof(*srv->fds);
-	for (i = 0; i < len; i++) {
-		/* srv->fds[i].fd = -1; */
-		srv->fds[i].events = POLLIN;
-		/* TODO POLLERR, POLLHUP, or POLLNVAL */
-	}
 
 	init_channel(srv, 0, name);
 	srv->chs[0].name[0] = '.';
@@ -345,23 +311,33 @@ find_channels(struct server *srv)
 	closedir(ds);
 }
 
-static int
+int
+read_ready(int fd)
+{
+	off_t cur;
+	off_t end;
+
+	cur = lseek(fd, 0, SEEK_CUR);
+	if (cur < 0)
+		die("error seeking in file\n");
+
+	end = lseek(fd, 0, SEEK_END);
+
+	lseek(fd, cur, SEEK_SET);
+	return end - cur;
+}
+
+static void
 poll_outputs(struct server *srv)
 {
 	size_t i;
 	size_t len;
-	int ret;
 
-	len = sizeof(srv->fds) / sizeof(*srv->fds);
-	poll(srv->fds, len, 1); /* TODO 0 timeout */
+	/* TODO poll all servers */
 
 	len = sizeof(srv->chs) / sizeof(*srv->chs);
-	for (i = 0; i < len; i++) {
-		if (srv->fds[i].revents)
-			ret = srv->chs[i].notify = 1;
-	}
-
-	return ret;
+	for (i = 0; i < len && srv->chs[i].name[0]; i++)
+		srv->chs[i].notify = read_ready(srv->chs[i].out);
 }
 
 static void
@@ -387,7 +363,6 @@ main(void)
 	struct channel ch[MAXCHN] = {0};
 	char in[BUFSIZ] = {0};
 	size_t chi = 0;
-	time_t t = time(0);
 	size_t i;
 	size_t cursrv = 0;
 
@@ -395,18 +370,18 @@ main(void)
 	for (i = 0; i < MAXSRV && servers[i].name[0]; i++)
 		find_channels(&servers[i]);
 	print_ch_tree(servers, sizeof(servers)/sizeof(*servers));
-return 0;
-	raw_term();
+
+	/* TODO raw_term(); */
 
 	/* TODO refactor */
 	for (i = 0; 1; ) {
 		poll_outputs(&servers[cursrv]);
-
-		if (time(0) - t) {
-			print_outputs(&servers[cursrv]);
+		if (servers[cursrv].chs[servers[cursrv].i].notify) {
+			print_tail(servers[cursrv].chs[servers[cursrv].i].out);
 			print_channels(&servers[cursrv]);
-			t = time(0);
 		}
+		getchar();
+		continue;
 
 putchar('\r');
 
