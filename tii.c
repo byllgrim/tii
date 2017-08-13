@@ -17,7 +17,7 @@ enum {
 	MAXCHN = 32,
 	CTRL_L = 0xC, /* TODO use '^L' */
 	CTRL_H = 0x8,
-	/* TODO ^J ^K ^U */
+	/* TODO ^J ^K ^U ^D */
 	BCKSP = 0x7f,
 	ROWS = 24,
 	COLS = 80
@@ -67,37 +67,16 @@ print_channels(struct server *srv)
 }
 
 static void
-send_input(char *msg, size_t n, struct channel *ch, size_t chi)
+send_input(struct server *srv, struct inbuf *in)
 {
-	FILE *f;
-	char p[BUFSIZ] = {0}; /* TODO better safe than sorry? */
-	/* TODO BUFSIZ is too big */
+	/* TODO check if buf is only blanks before sending */
+	printf("TODO send_input: %s\n", in->txt);
+	(void)srv;
+	(void)in;
 
-	/* TODO refactor and clean */
-	/* TODO check bounds of n */
-
-	strcat(p, ".");
-	if (chi) {
-		strcat(p, "/");
-		strcat(p, ch[chi].name);
-	}
-	strcat(p, "/in");
-	/* TODO check if joined channel */
-	/* TODO check if ii is running */
-	if (!(f = fopen(p, "a"))) {
-		printf("send_input: failed to open file\n");
-		/* TODO proper error checking */
-		return;
-	}
-
-	/* TODO proper error checking */
-	/* TODO check if 'in' fifo points to anything */
-	if (fwrite(msg, sizeof(char), n, f))
-		printf("sent success\n");
-	else
-		printf("boo\n");
-
-	fclose(f);
+	in->i = 0;
+	memset(in->txt, '\0', sizeof(in->txt));
+		/* TODO check return of memset */
 }
 
 static int
@@ -132,47 +111,48 @@ handle_selection(struct server *srv, struct inbuf *in, char c)
 }
 
 static void
+handle_backspace(struct server *srv, struct inbuf *in)
+{
+	if (in->i)
+		--in->i;
+	in->txt[in->i] = '\0';
+	srv->chs[srv->i].notify = 1;
+	/* TODO check all edge cases */
+}
+
+static void
+insert_input(struct inbuf *in, char c)
+{
+	/* TODO rename */
+
+	if (in->i >= sizeof(in->txt) - 2) /* TODO better bounds */
+		return;
+
+	in->txt[in->i] = c;
+	in->i++;
+}
+
+static void
 handle_input(struct server *srv, struct inbuf *in)
 {
 	char c;
-	size_t n;
-
-	/* TODO define a SINGLE responsibility for this function! */
 
 	if (!stdin_ready())
 		return;
 
 	c = getchar();
-
-	if (c == CTRL_H || c == CTRL_L) {
+	if (c == CTRL_H || c == CTRL_L)
 		handle_selection(srv, in, c);
-		return; /* TODO if ladder */
-	}
-
-	/* TODO ^D exit */
-
-	if (c == BCKSP) {
-		if (in->i)
-			--in->i;
-		in->txt[in->i] = '\0';
-		srv->chs[srv->i].notify = 1;
-		/* TODO check all edge cases */
-		return;
-	}
-
-	/* TODO check if buf is only blanks before sending */
-	if (c == '\n' && !(in->i)) /* TODO handle in send function? */
-		return;
+	else if (c == BCKSP)
+		handle_backspace(srv, in);
+	else if (c == '\n' && in->i)
+		send_input(srv, in);
+	else if (isprint(c))
+		insert_input(in, c);
+	else
+		(void)0; /* TODO what? */
 
 	srv->chs[srv->i].notify = 1;
-
-	n = sizeof(in->txt);
-	if (in->i >= n - 2) /* TODO better bounds */
-		in->txt[n - 2] = c = '\n'; /* TODO too many assignments */
-	else if (isprint(c) || isspace(c))
-		in->txt[in->i++] = c; /* TODO too complex expression */
-
-	(void)send_input; /* TODO */
 }
 
 static void
