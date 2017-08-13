@@ -61,6 +61,8 @@ print_channels(struct server *srv)
 	size_t i;
 	char *name;
 
+	/* TODO protect against column overflow */
+
 	printf("ch: ");
 	for (i = 0; i < MAXCHN && srv->chs[i].name[0]; i++) {
 		name = i ? srv->chs[i].name : srv->name;
@@ -141,6 +143,8 @@ channel_selection(struct server *srv, struct inbuf *in, char c)
 	if (c == CTRL_L) {
 		if (srv->chs[srv->i + 1].name[0])
 			srv->i++;
+
+		/* TODO check bounds */
 	}
 
 	if (c == CTRL_H)
@@ -172,28 +176,42 @@ insert_input(struct inbuf *in, char c)
 }
 
 static void
-server_selection(char c)
+server_selection(struct srv_list *sl, char c)
 {
-	if (c == CTRL_N)
-		printf("next channel\n");
+	struct server *srv;
 
-	if (c == CTRL_P)
-		printf("prev channel\n");
+	if (c == CTRL_N) {
+		if (sl->svs[sl->i + 1].name[0])
+			sl->i++;
+
+		/* TODO check bounds */
+	}
+
+	if (c == CTRL_P) {
+		if (sl->i)
+			sl->i--;
+	}
+
+	srv = &sl->svs[sl->i];
+	srv->chs[srv->i].notify = 1; /* TODO necessary? */
 }
 
 static void
-handle_input(struct server *srv, struct inbuf *in)
+handle_input(struct srv_list *sl, struct inbuf *in)
 {
+	struct server *srv = &sl->svs[sl->i];
 	char c;
 
 	if (!stdin_ready())
 		return;
 
+	/* TODO protect against column overflow */
+
 	c = getchar();
 	if (c == CTRL_H || c == CTRL_L)
 		channel_selection(srv, in, c);
 	else if (c == CTRL_N || c == CTRL_P)
-		server_selection(c);
+		server_selection(sl, c);
 	else if (c == CTRL_U)
 		clear_input(in);
 	else if (c == BCKSP)
@@ -495,7 +513,7 @@ main(void)
 	for (;;) {
 		find_channels(&sl.svs[sl.i]);
 		print_outputs(&sl.svs[sl.i], in.txt);
-		handle_input(&sl.svs[sl.i], &in);
+		handle_input(&sl, &in);
 	}
 
 	return EXIT_SUCCESS; /* TODO not reachable */
