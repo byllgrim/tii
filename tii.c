@@ -32,8 +32,8 @@ struct inbuf {
 
 struct channel {
 	char name[NAMELEN];
-	int notify; /* TODO char? */
-	int fresh; /* TODO char? rename */
+	char notify;
+	char fresh; /* TODO rename */
 	int out;
 };
 
@@ -83,6 +83,20 @@ clear_input(struct inbuf *in)
 	memset(in->txt, '\0', sizeof(in->txt));
 }
 
+static int
+is_all_blanks(struct inbuf *in)
+{
+	size_t i;
+
+	/* TODO strnlen vs posix.1-2001 */
+	for (i = 0; i < strlen(in->txt); i++) {
+		if (!isspace(in->txt[i]))
+			return 0;
+	}
+
+	return 1;
+}
+
 static void
 send_input(struct server *srv, struct inbuf *in)
 {
@@ -90,20 +104,24 @@ send_input(struct server *srv, struct inbuf *in)
 	int fd;
 	ssize_t n;
 
-	getcwd(cwd, sizeof(cwd)); /* TODO check return */
-	chdir(srv->name); /* TODO check return */
-	chdir(srv->chs[srv->i].name); /* TODO check return */
-	
-	/* TODO check if buf is only blanks before sending? */
+	if (is_all_blanks(in))
+		return;
+
+	/* TODO refactor */
+	if (!getcwd(cwd, sizeof(cwd)))
+		die("send_input: failed to get cwd\n");
+	if (chdir(srv->name) < 0)
+		die("send_input: failed to chdir\n"); /* TODO detail */
+	if (chdir(srv->chs[srv->i].name) < 0)
+		die("send_input: failed to chdir\n"); /* TODO detail */
 
 	fd = open("in", O_WRONLY | O_NONBLOCK);
 		/* TODO keep open all the time? */
-		/* TODO don't create */
 		/* TODO die if not existing/connected */
 		/* TODO O_APPEND? */
 	if (fd < 0) {
 		/* TODO visually indicate ENXIO? */
-		if (errno == ENXIO) /* no fifo reader */
+		if (errno == ENXIO)
 			goto exit;
 		else
 			die("send_input: cannot open 'in' file\n");
