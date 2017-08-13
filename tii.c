@@ -85,6 +85,7 @@ send_input(struct server *srv, struct inbuf *in)
 		/* TODO die if not existing/connected */
 		/* TODO O_APPEND? */
 	if (fd < 0) {
+		/* TODO visually indicate ENXIO? */
 		if (errno == ENXIO) /* no fifo reader */
 			goto exit;
 		else
@@ -194,21 +195,24 @@ raw_term(void)
 static void
 print_tail(int fd)
 {
-	off_t pos;
-	char buf[BUFSIZ];
-	size_t n;
+	off_t pos, end;
+	char buf[BUFSIZ]; /* TODO too big? */
+	size_t a, b;
 
-	pos = lseek(fd, 0, SEEK_END);
-
+	pos = end = lseek(fd, 0, SEEK_END);
 	pos -= ROWS*COLS;
 	if (pos < 0)
 		pos = 0;
 	lseek(fd, pos, SEEK_SET);
 
-	/* TODO what if to small to fill screen? */
+	/* TODO less complicated logic */
+	a = ROWS*COLS - (end - pos);
+	a = (a > BUFSIZ) ? BUFSIZ : a;
+	memset(buf, ' ', a);
+	buf[a - 1] = '\n';
 
-	for (; (n = read(fd, buf, sizeof(buf))); )
-		write(STDOUT_FILENO, buf, n);
+	b = read(fd, buf + a, sizeof(buf) - a); /* TODO check return */
+	write(STDOUT_FILENO, buf, a + b);
 }
 
 int
@@ -407,6 +411,7 @@ main(void)
 	struct inbuf in = {0};
 
 	find_servers(servers, sizeof(servers)/sizeof(*servers));
+	/* TODO reset notifies on first run? */
 	print_ch_tree(servers, sizeof(servers)/sizeof(*servers));
 
 	raw_term();
