@@ -51,19 +51,18 @@ static void
 print_channels(struct server *srv)
 {
 	size_t i;
-
-	/* TODO don't print when theres no change */
+	char *name;
 
 	printf("ch: ");
 	for (i = 0; i < MAXCHN && srv->chs[i].name[0]; i++) {
+		name = i ? srv->chs[i].name : srv->name;
 		if (i == srv->i)
-			printf("[%s]", srv->name);
+			printf("[%s]", name);
 		else
 			printf(" %s%c",
-			       srv->chs[i].name,
+			       name,
 			       srv->chs[i].notify ? '*' : ' ');
 	}
-	/* TODO refresh output immediately */
 	putchar('\n');
 }
 
