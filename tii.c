@@ -23,6 +23,11 @@ enum {
 	COLS = 80
 };
 
+struct inbuf {
+	char txt[BUFSIZ];
+	size_t i;
+};
+
 struct channel {
 	char name[NAMELEN];
 	int notify; /* TODO char? */
@@ -96,17 +101,27 @@ send_input(char *msg, size_t n, struct channel *ch, size_t chi)
 	fclose(f);
 }
 
-static void
-handle_input(char *buf, size_t n, size_t *i, size_t *chi)
+static int
+stdin_ready(void)
 {
 	struct pollfd fds = {0};
-	char c;
-
-	/* TODO define a SINGLE responsibility for this function! */
 
 	fds.fd = STDIN_FILENO;
 	fds.events = POLLIN;
-	if (!poll(&fds, 1, 10)) /* TODO less magical numbers */
+	poll(&fds, 1, 10);
+
+	return fds.revents & POLLIN;
+}
+
+static void
+handle_input(struct server *srv, struct inbuf *in)
+{
+	char c;
+	size_t n;
+
+	/* TODO define a SINGLE responsibility for this function! */
+
+	if (!stdin_ready())
 		return;
 	/* TODO check POLLIN */
 
@@ -115,31 +130,39 @@ handle_input(char *buf, size_t n, size_t *i, size_t *chi)
 	/* TODO ^D exit */
 	/* TODO what if overflowing terminal width? */
 	if (c == CTRL_L)
-		(*chi)++; /* TODO check limit */
+		srv->i++; /* TODO check limit */
 
 	if (c == CTRL_H)
-		*chi ? (*chi)-- : 0; /* TODO prettier expression */
+		srv->i ? srv->i-- : 0;
 
 	if (c == CTRL_H || c == CTRL_L) {
-		buf[0] = '\0';
+		in->txt[0] = '\0';
 		return;
 		/* TODO better ctrl policy */
 	}
 
 	if (c == BCKSP) {
-		(*i) ?  buf[--(*i)] = '\0' : 0; /* TODO less cryptic */
+		if (in->i)
+			--in->i;
+		in->txt[in->i] = '\0';
+		srv->chs[srv->i].notify = 1;
 		/* TODO check all edge cases */
 		return;
 	}
 
 	/* TODO check if buf is only blanks before sending */
-	if (c == '\n' && !(*i)) /* TODO handle in send function? */
+	if (c == '\n' && !(in->i)) /* TODO handle in send function? */
 		return;
 
-	if (*i >= n - 2) /* TODO better bounds */
-		buf[n - 2] = c = '\n'; /* TODO too many assignments */
+	srv->chs[srv->i].notify = 1;
+
+	n = sizeof(in->txt);
+	if (in->i >= n - 2) /* TODO better bounds */
+		in->txt[n - 2] = c = '\n'; /* TODO too many assignments */
 	else if (isprint(c) || isspace(c))
-		buf[(*i)++] = c; /* TODO too complex expression */
+		in->txt[in->i++] = c; /* TODO too complex expression */
+
+	(void)send_input; /* TODO */
 }
 
 static void
@@ -196,17 +219,24 @@ poll_outputs(struct server *srv)
 	/* TODO poll all servers */
 
 	len = sizeof(srv->chs) / sizeof(*srv->chs);
-	for (i = 0; i < len && srv->chs[i].name[0]; i++)
-		srv->chs[i].notify = read_ready(srv->chs[i].out);
+	for (i = 0; i < len && srv->chs[i].name[0]; i++) {
+		if (read_ready(srv->chs[i].out))
+			srv->chs[i].notify = 1;
+	}
 }
 
 static void
-print_outputs(struct server *srv)
+print_outputs(struct server *srv, char *in)
 {
 	poll_outputs(srv);
 	if (srv->chs[srv->i].notify) {
 		print_tail(srv->chs[srv->i].out);
+		srv->chs[srv->i].notify = 0;
+
 		print_channels(srv);
+
+		printf("in: %s", in);
+		fflush(stdout);
 	}
 }
 
@@ -364,39 +394,21 @@ print_ch_tree(struct server *svs, size_t n)
 int
 main(void)
 {
-	struct server servers[MAXSRV] = {0};
-	struct channel ch[MAXCHN] = {0};
-	char in[BUFSIZ] = {0};
-	size_t chi = 0;
 	size_t i;
+	struct server servers[MAXSRV] = {0};
 	size_t cursrv = 0;
+	struct inbuf in = {0};
 
 	find_servers(servers, sizeof(servers)/sizeof(*servers));
 	for (i = 0; i < MAXSRV && servers[i].name[0]; i++)
 		find_channels(&servers[i]);
 	print_ch_tree(servers, sizeof(servers)/sizeof(*servers));
 
-	/* TODO raw_term(); */
-
-	/* TODO refactor */
-	for (i = 0; 1; ) {
-		print_outputs(&servers[cursrv]);
-		getchar();
-		continue;
-
-putchar('\r');
-
-		printf("in: %s", in); /* TODO check return */
-		handle_input(in, sizeof(in), &i, &chi);
-fflush(stdout);
-
-		if (strchr(in, '\n')) { /* TODO responsibility */
-			send_input(in, strlen(in), ch, chi);
-			i = 0;
-			memset(in, 0, BUFSIZ); /* TODO check return */
-			/* TODO is memset necessary? */
-		}
+	raw_term();
+	for (;;) {
+		print_outputs(&servers[cursrv], in.txt);
+		handle_input(&servers[cursrv], &in);
 	}
 
-	return EXIT_SUCCESS;
+	return EXIT_SUCCESS; /* TODO not reachable */
 }
