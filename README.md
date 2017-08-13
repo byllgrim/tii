@@ -9,6 +9,12 @@ Dependencies:
 
 Usage:
 `cd` into the `irc` directory and launch `tii`.
-The `out` file will be shown in terminal, along with the selected channel, and
-an input line at the bottom.
-Next channel ^L, prev channel ^H, clear input ^U.
+The `out` file will be shown in terminal, along with a channel list
+and an input line at the bottom.
+
+    ^L next channel
+    ^H prev channel
+    ^N next server
+    ^P prev server
+    ^U clear input
+    ^C exit tii
