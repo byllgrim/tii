@@ -69,14 +69,32 @@ print_channels(struct server *srv)
 static void
 send_input(struct server *srv, struct inbuf *in)
 {
-	/* TODO check if buf is only blanks before sending */
-	printf("TODO send_input: %s\n", in->txt);
-	(void)srv;
-	(void)in;
+	char cwd[BUFSIZ];
+	int fd;
+	ssize_t n;
+
+	getcwd(cwd, sizeof(cwd)); /* TODO check return */
+	chdir(srv->name); /* TODO check return */
+	chdir(srv->chs[srv->i].name); /* TODO check return */
+	
+	/* TODO check if buf is only blanks before sending? */
+
+	fd = open("in", O_WRONLY);
+		/* TODO keep open all the time? */
+		/* TODO don't create */
+		/* TODO die if not existing/connected */
+	if (fd < 0)
+		die("send_input: cannot open 'in' file\n");
+
+	n = write(fd, in->txt, sizeof(in->txt));
+	if (n != sizeof(in->txt))
+		die("send_input: transmission failed\n");
 
 	in->i = 0;
 	memset(in->txt, '\0', sizeof(in->txt));
-		/* TODO check return of memset */
+
+	chdir(cwd);
+	close(fd);
 }
 
 static int
@@ -162,8 +180,9 @@ raw_term(void)
 
 	tcgetattr(STDIN_FILENO, &attr);
 	attr.c_lflag &= ~(ICANON | ECHO);
-	/* TODO sufficient with just setbuf */
 	tcsetattr(STDIN_FILENO, TCSANOW, &attr);
+
+	/* TODO sufficient with just setbuf */
 }
 
 static void
@@ -206,7 +225,7 @@ poll_outputs(struct server *srv)
 	size_t i;
 	size_t len;
 
-	/* TODO poll all servers */
+	/* TODO poll ALL servers */
 
 	len = sizeof(srv->chs) / sizeof(*srv->chs);
 	for (i = 0; i < len && srv->chs[i].name[0]; i++) {
@@ -218,7 +237,7 @@ poll_outputs(struct server *srv)
 static void
 print_outputs(struct server *srv, char *in)
 {
-	poll_outputs(srv);
+	poll_outputs(srv); /* TODO get bigger data */
 	if (srv->chs[srv->i].notify) {
 		print_tail(srv->chs[srv->i].out);
 		srv->chs[srv->i].notify = 0;
@@ -243,7 +262,7 @@ init_channel(struct server *srv, size_t i, char *name)
 		/* TODO check return of getcwd */
 		/* TODO relative to irc_dir_path or srv->path */
 	chdir(name);
-	srv->chs[i].out = open("out", O_RDONLY);
+	srv->chs[i].out = open("out", O_RDONLY); /* TODO dont create */
 	if (srv->chs[i].out < 0)
 		die("init_channel: failed to open 'out' file\n");
 		/* TODO descriptive err msg */
