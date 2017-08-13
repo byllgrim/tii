@@ -79,17 +79,23 @@ send_input(struct server *srv, struct inbuf *in)
 	
 	/* TODO check if buf is only blanks before sending? */
 
-	fd = open("in", O_WRONLY);
+	fd = open("in", O_WRONLY | O_NONBLOCK);
 		/* TODO keep open all the time? */
 		/* TODO don't create */
 		/* TODO die if not existing/connected */
-	if (fd < 0)
-		die("send_input: cannot open 'in' file\n");
+		/* TODO O_APPEND? */
+	if (fd < 0) {
+		if (errno == ENXIO) /* no fifo reader */
+			goto exit;
+		else
+			die("send_input: cannot open 'in' file\n");
+	}
 
 	n = write(fd, in->txt, sizeof(in->txt));
 	if (n != sizeof(in->txt))
 		die("send_input: transmission failed\n");
 
+exit:
 	in->i = 0;
 	memset(in->txt, '\0', sizeof(in->txt));
 
@@ -198,6 +204,8 @@ print_tail(int fd)
 	if (pos < 0)
 		pos = 0;
 	lseek(fd, pos, SEEK_SET);
+
+	/* TODO what if to small to fill screen? */
 
 	for (; (n = read(fd, buf, sizeof(buf))); )
 		write(STDOUT_FILENO, buf, n);
@@ -417,6 +425,7 @@ main(void)
 	for (;;) {
 		print_outputs(&servers[cursrv], in.txt);
 		handle_input(&servers[cursrv], &in);
+		/* TODO periodically check (dis)connections */
 	}
 
 	return EXIT_SUCCESS; /* TODO not reachable */
