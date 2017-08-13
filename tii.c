@@ -4,7 +4,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <poll.h> /* TODO remove */
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,6 +31,7 @@ struct inbuf {
 struct channel {
 	char name[NAMELEN];
 	int notify; /* TODO char? */
+	int fresh; /* TODO char? rename */
 	int out;
 };
 
@@ -265,19 +266,21 @@ static void
 init_channel(struct server *srv, size_t i, char *name)
 {
 	char cwd[BUFSIZ];
-	strncpy(srv->chs[i].name, name, sizeof(srv->chs[i].name));
 
+	strncpy(srv->chs[i].name, name, sizeof(srv->chs[i].name));
 	srv->chs[i].notify = 0;
+	srv->chs[i].fresh = 1;
 
 	getcwd(cwd, sizeof(cwd));
 		/* TODO don't depend on state */
-		/* TODO check return of getcwd */
+		/* TODO check return */
 		/* TODO relative to irc_dir_path or srv->path */
-	chdir(name);
+	chdir(name); /* TODO check return */
 	srv->chs[i].out = open("out", O_RDONLY); /* TODO dont create */
 	if (srv->chs[i].out < 0)
 		die("init_channel: failed to open 'out' file\n");
 		/* TODO descriptive err msg */
+
 	chdir(cwd);
 }
 
@@ -356,35 +359,40 @@ add_channel(struct server *srv, char *name)
 			return;
 		}
 
-		if (!strncmp(chs[i].name, name, sizeof(chs[i].name)))
+		if (!strncmp(chs[i].name, name, sizeof(chs[i].name))) {
+			chs[i].fresh = 1;
 			return;
+		}
 	}
 }
 
 static void
-find_channels(struct server *srv)
+unfreshen_channels(struct server *srv)
 {
-	DIR *ds;
-	struct dirent *de;
+	size_t i, len;
 
-	ds = opendir(srv->name);
-	if (!ds)
-		die("find_channels: failed to open server directory\n");
+	/* TODO rename. unfreshen? */
 
-	if (chdir(srv->name) < 0)
-		die("find_channels: can't chdir\n");
-
-	/* TODO dry from find_servers */
-	errno = 0;
-	for (; (de = readdir(ds)); ) {
-		if (is_dir(de) && de->d_name[0] != '.')
-			add_channel(srv, de->d_name);
+	len = sizeof(srv->chs) / sizeof(*srv->chs);
+	for (i = 1; i < len && srv->chs[i].name[0]; i++) {
+		srv->chs[i].fresh = 0;
 	}
-	if (errno)
-		die("find_channels: error reading directory entries\n");
+}
 
-	chdir(".."); /* TODO getcwd() */
-	closedir(ds);
+static void
+remove_channel(struct server *srv, size_t n)
+{
+	size_t i, len;
+
+	len = sizeof(srv->chs) / sizeof(*srv->chs);
+	for (i = n; i < len - 1; i++)
+		srv->chs[i] = srv->chs[i + 1];
+
+	/* TODO what about last ch? */
+
+	if (srv->i >= n)
+		srv->i = n - 1;
+	srv->chs[srv->i].notify = 1;
 }
 
 static void
@@ -401,6 +409,49 @@ print_ch_tree(struct server *svs, size_t n)
 			printf("    %s\n", svs[i].chs[j].name);
 		}
 	}
+}
+
+static void
+remove_unfresh(struct server *srv)
+{
+	size_t i, len;
+
+	/* TODO rename */
+
+	len = sizeof(srv->chs) / sizeof(*srv->chs);
+	for (i = 0; i < len && srv->chs[i].name[0]; i++) {
+		if (!srv->chs[i].fresh)
+			remove_channel(srv, i);
+	}
+}
+
+static void
+find_channels(struct server *srv)
+{
+	DIR *ds;
+	struct dirent *de;
+
+	ds = opendir(srv->name);
+	if (!ds)
+		die("find_channels: failed to open server directory\n");
+
+	if (chdir(srv->name) < 0)
+		die("find_channels: can't chdir\n");
+
+	unfreshen_channels(srv); /* TODO more elegant solution */
+
+	/* TODO dry from find_servers */
+	errno = 0;
+	for (; (de = readdir(ds)); ) {
+		if (is_dir(de) && de->d_name[0] != '.')
+			add_channel(srv, de->d_name);
+	}
+	if (errno)
+		die("find_channels: error reading directory entries\n");
+
+	remove_unfresh(srv);
+	chdir(".."); /* TODO getcwd() */
+	closedir(ds);
 }
 
 int
