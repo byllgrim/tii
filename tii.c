@@ -113,6 +113,25 @@ stdin_ready(void)
 }
 
 static void
+handle_selection(struct server *srv, struct inbuf *in, char c)
+{
+	/* TODO rename: arrows control movement selection */
+
+	in->txt[0] = '\0'; /* TODO memset 0? */
+	in->i = 0;
+
+	if (c == CTRL_L) {
+		if (srv->chs[srv->i + 1].name[0])
+			srv->i++;
+	}
+
+	if (c == CTRL_H)
+		srv->i ? srv->i-- : 0;
+
+	srv->chs[srv->i].notify = 1;
+}
+
+static void
 handle_input(struct server *srv, struct inbuf *in)
 {
 	char c;
@@ -122,23 +141,15 @@ handle_input(struct server *srv, struct inbuf *in)
 
 	if (!stdin_ready())
 		return;
-	/* TODO check POLLIN */
 
 	c = getchar();
 
-	/* TODO ^D exit */
-	/* TODO what if overflowing terminal width? */
-	if (c == CTRL_L)
-		srv->i++; /* TODO check limit */
-
-	if (c == CTRL_H)
-		srv->i ? srv->i-- : 0;
-
 	if (c == CTRL_H || c == CTRL_L) {
-		in->txt[0] = '\0';
-		return;
-		/* TODO better ctrl policy */
+		handle_selection(srv, in, c);
+		return; /* TODO if ladder */
 	}
+
+	/* TODO ^D exit */
 
 	if (c == BCKSP) {
 		if (in->i)
