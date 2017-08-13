@@ -15,10 +15,11 @@ enum {
 	NAMELEN = 128,
 	MAXSRV = 16,
 	MAXCHN = 32,
-	CTRL_L = 0xC, /* TODO use '^L' */
-	CTRL_H = 0x8,
+	CTRL_L = 0x0C,
+	CTRL_H = 0x08,
+	CTRL_N = 0x0E,
+	CTRL_P = 0x10,
 	CTRL_U = 0x15,
-	/* TODO ^J ^K ^D */
 	BCKSP = 0x7f,
 	ROWS = 24,
 	COLS = 80
@@ -39,6 +40,11 @@ struct channel {
 struct server {
 	char name[NAMELEN];
 	struct channel chs[MAXCHN];
+	size_t i;
+};
+
+struct srv_list {
+	struct server svs[MAXSRV];
 	size_t i;
 };
 
@@ -125,7 +131,7 @@ stdin_ready(void)
 }
 
 static void
-handle_selection(struct server *srv, struct inbuf *in, char c)
+channel_selection(struct server *srv, struct inbuf *in, char c)
 {
 	/* TODO rename: arrows control movement selection */
 
@@ -166,6 +172,16 @@ insert_input(struct inbuf *in, char c)
 }
 
 static void
+server_selection(char c)
+{
+	if (c == CTRL_N)
+		printf("next channel\n");
+
+	if (c == CTRL_P)
+		printf("prev channel\n");
+}
+
+static void
 handle_input(struct server *srv, struct inbuf *in)
 {
 	char c;
@@ -175,7 +191,9 @@ handle_input(struct server *srv, struct inbuf *in)
 
 	c = getchar();
 	if (c == CTRL_H || c == CTRL_L)
-		handle_selection(srv, in, c);
+		channel_selection(srv, in, c);
+	else if (c == CTRL_N || c == CTRL_P)
+		server_selection(c);
 	else if (c == CTRL_U)
 		clear_input(in);
 	else if (c == BCKSP)
@@ -466,19 +484,18 @@ find_channels(struct server *srv)
 int
 main(void)
 {
-	struct server servers[MAXSRV] = {0};
-	size_t cursrv = 0;
+	struct srv_list sl = {0};
 	struct inbuf in = {0};
 
-	find_servers(servers, sizeof(servers)/sizeof(*servers));
+	find_servers(sl.svs, sizeof(sl.svs)/sizeof(*sl.svs));
 	/* TODO reset notifies on first run? */
-	print_ch_tree(servers, sizeof(servers)/sizeof(*servers));
+	print_ch_tree(sl.svs, sizeof(sl.svs)/sizeof(*sl.svs));
 
 	raw_term();
 	for (;;) {
-		find_channels(&servers[cursrv]);
-		print_outputs(&servers[cursrv], in.txt);
-		handle_input(&servers[cursrv], &in);
+		find_channels(&sl.svs[sl.i]);
+		print_outputs(&sl.svs[sl.i], in.txt);
+		handle_input(&sl.svs[sl.i], &in);
 	}
 
 	return EXIT_SUCCESS; /* TODO not reachable */
