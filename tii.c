@@ -27,12 +27,14 @@ enum {
 struct channel {
 	char name[NAMELEN];
 	int notify; /* TODO char? */
+	int out;
 };
 
 struct server {
 	char name[NAMELEN];
 	struct channel chs[MAXCHN];
 	size_t i;
+	struct pollfd fds[MAXCHN];
 };
 
 static void
@@ -172,23 +174,23 @@ print_tail(int fd)
 }
 
 static void
-print_out(struct server *srv)
+print_outputs(struct server *srv)
 {
 	char cwd[BUFSIZ];
 	int out;
 
 	if (!getcwd(cwd, sizeof(cwd)))
-		die("print_out: failed to get cwd\n");
+		die("print_outputs: failed to get cwd\n");
 
 	errno = 0;
 	chdir(srv->name);
 	chdir(srv->chs[srv->i].name);
 	if (errno) /* TODO not all under same comb? */
-		die("print_out: failed to cd into channel\n");
+		die("print_outputs: failed to cd into channel\n");
 
 	out = open("out", O_RDONLY); /* TODO mode */
 	if (out < 0)
-		die("print_out: failed to open 'out' file\n");
+		die("print_outputs: failed to open 'out' file\n");
 
 	print_tail(out);
 
@@ -197,10 +199,45 @@ print_out(struct server *srv)
 }
 
 static void
+init_channel(struct server *srv, size_t i, char *name)
+{
+	char cwd[BUFSIZ];
+	strncpy(srv->chs[i].name, name, sizeof(srv->chs[i].name));
+
+	srv->chs[i].notify = 0;
+
+	getcwd(cwd, sizeof(cwd));
+		/* TODO don't depend on state */
+		/* TODO check return of getcwd */
+		/* TODO relative to irc_dir_path or srv->path */
+	chdir(name);
+	srv->chs[i].out = open("out", O_RDONLY);
+	if (srv->chs[i].out < 0)
+		die("init_channel: failed to open 'out' file\n");
+		/* TODO descriptive err msg */
+	chdir(cwd);
+
+	srv->fds[i].fd = srv->chs[i].out;
+}
+
+static void
 init_server(struct server *srv, char *name)
 {
+	size_t i;
+	size_t len;
+
 	strncpy(srv->name, name, sizeof(srv->name));
+
+	len = sizeof(srv->fds) / sizeof(*srv->fds);
+	for (i = 0; i < len; i++) {
+		/* srv->fds[i].fd = -1; */
+		srv->fds[i].events = POLLIN;
+		/* TODO POLLERR, POLLHUP, or POLLNVAL */
+	}
+
+	init_channel(srv, 0, name);
 	srv->chs[0].name[0] = '.';
+	srv->chs[0].name[1] = '\0';
 	srv->i = 0;
 }
 
@@ -226,8 +263,13 @@ is_dir(struct dirent *de)
 {
 	struct stat sb;
 
-	if (stat(de->d_name, &sb) < 0)
+	if (stat(de->d_name, &sb) < 0) {
+		fprintf(stderr,
+		        "is_dir: %s %s\n",
+		        de->d_name,
+			strerror(errno));
 		die("is_dir: error on stat()\n");
+	}
 
 	return S_ISDIR(sb.st_mode);
 }
@@ -259,12 +301,14 @@ static void
 add_channel(struct server *srv, char *name)
 {
 	size_t i;
+	size_t len;
 	struct channel *chs = srv->chs;
 
-	for (i = 0; i < sizeof(srv->chs); i++) {
+	len = sizeof(srv->chs) / sizeof(*srv->chs);
+	for (i = 0; i < len; i++) {
 		if (chs[i].name[0] == 0) {
-			strncpy(chs[i].name, name, sizeof(chs[i].name));
 			printf("adding %s to %s\n", name, srv->name);
+			init_channel(srv, i, name);
 			return;
 		}
 
@@ -301,6 +345,41 @@ find_channels(struct server *srv)
 	closedir(ds);
 }
 
+static int
+poll_outputs(struct server *srv)
+{
+	size_t i;
+	size_t len;
+	int ret;
+
+	len = sizeof(srv->fds) / sizeof(*srv->fds);
+	poll(srv->fds, len, 1); /* TODO 0 timeout */
+
+	len = sizeof(srv->chs) / sizeof(*srv->chs);
+	for (i = 0; i < len; i++) {
+		if (srv->fds[i].revents)
+			ret = srv->chs[i].notify = 1;
+	}
+
+	return ret;
+}
+
+static void
+print_ch_tree(struct server *svs, size_t n)
+{
+	size_t i, j, chlen;
+
+	printf("svs and chs:\n");
+
+	chlen = sizeof(svs[0].chs) / sizeof(*svs[0].chs);
+	for (i = 0; i < n && svs[i].name[0]; i++) {
+		printf("  %s\n", svs[i].name);
+		for (j = 0; j < chlen && svs[i].chs[j].name[0]; j++) {
+			printf("    %s\n", svs[i].chs[j].name);
+		}
+	}
+}
+
 int
 main(void)
 {
@@ -312,24 +391,28 @@ main(void)
 	size_t i;
 	size_t cursrv = 0;
 
-	find_servers(servers, MAXSRV);
+	find_servers(servers, sizeof(servers)/sizeof(*servers));
 	for (i = 0; i < MAXSRV && servers[i].name[0]; i++)
 		find_channels(&servers[i]);
+	print_ch_tree(servers, sizeof(servers)/sizeof(*servers));
+return 0;
+	raw_term();
 
 	/* TODO refactor */
-	raw_term();
-	setbuf(stdout, 0); /* TODO less hacky sollution to print order */
-	i = 0;
-	for (;;) {
+	for (i = 0; 1; ) {
+		poll_outputs(&servers[cursrv]);
+
 		if (time(0) - t) {
-			print_out(&servers[cursrv]);
+			print_outputs(&servers[cursrv]);
 			print_channels(&servers[cursrv]);
 			t = time(0);
 		}
 
-		fwrite("\r", sizeof(char), 1, stdout); /* TODO check return */
+putchar('\r');
+
 		printf("in: %s", in); /* TODO check return */
 		handle_input(in, sizeof(in), &i, &chi);
+fflush(stdout);
 
 		if (strchr(in, '\n')) { /* TODO responsibility */
 			send_input(in, strlen(in), ch, chi);
