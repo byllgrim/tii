@@ -33,7 +33,7 @@ struct inbuf {
 struct channel {
 	char name[NAMELEN];
 	char notify;
-	char fresh; /* TODO rename */
+	char active;
 	int out;
 };
 
@@ -151,12 +151,11 @@ stdin_ready(void)
 }
 
 static void
-channel_selection(struct server *srv, struct inbuf *in, char c)
+change_channel(struct server *srv, struct inbuf *in, char c)
 {
-	/* TODO rename: arrows control movement selection */
-
 	in->txt[0] = '\0'; /* TODO memset 0? */
 	in->i = 0;
+	/* TODO don't clear if not changing */
 
 	if (c == CTRL_L) {
 		if (srv->chs[srv->i + 1].name[0])
@@ -172,20 +171,19 @@ channel_selection(struct server *srv, struct inbuf *in, char c)
 }
 
 static void
-handle_backspace(struct server *srv, struct inbuf *in)
+erase_character(struct server *srv, struct inbuf *in)
 {
+	/* TODO check all edge cases */
+
 	if (in->i)
 		--in->i;
 	in->txt[in->i] = '\0';
-	srv->chs[srv->i].notify = 1;
-	/* TODO check all edge cases */
+	srv->chs[srv->i].notify = 1; /* TODO don't need notify here? */
 }
 
 static void
-insert_input(struct inbuf *in, char c)
+append_input(struct inbuf *in, char c)
 {
-	/* TODO rename */
-
 	if (in->i >= sizeof(in->txt) - 2) /* TODO better bounds */
 		return;
 
@@ -194,7 +192,7 @@ insert_input(struct inbuf *in, char c)
 }
 
 static void
-server_selection(struct srv_list *sl, char c)
+change_server(struct srv_list *sl, char c)
 {
 	struct server *srv;
 
@@ -227,17 +225,17 @@ handle_input(struct srv_list *sl, struct inbuf *in)
 
 	c = getchar();
 	if (c == CTRL_H || c == CTRL_L)
-		channel_selection(srv, in, c);
+		change_channel(srv, in, c);
 	else if (c == CTRL_N || c == CTRL_P)
-		server_selection(sl, c);
+		change_server(sl, c);
 	else if (c == CTRL_U)
 		clear_input(in);
 	else if (c == BCKSP)
-		handle_backspace(srv, in);
+		erase_character(srv, in);
 	else if (c == '\n' && in->i)
 		send_input(srv, in);
 	else if (isprint(c))
-		insert_input(in, c);
+		append_input(in, c);
 	else
 		(void)0; /* TODO what? */
 
@@ -330,9 +328,11 @@ init_channel(struct server *srv, size_t i, char *name)
 {
 	char cwd[BUFSIZ];
 
+	/* TODO what if already initialized? */
+
 	strncpy(srv->chs[i].name, name, sizeof(srv->chs[i].name));
 	srv->chs[i].notify = 0;
-	srv->chs[i].fresh = 1;
+	srv->chs[i].active = 1;
 
 	getcwd(cwd, sizeof(cwd));
 		/* TODO don't depend on state */
@@ -423,22 +423,20 @@ add_channel(struct server *srv, char *name)
 		}
 
 		if (!strncmp(chs[i].name, name, sizeof(chs[i].name))) {
-			chs[i].fresh = 1;
+			chs[i].active = 1;
 			return;
 		}
 	}
 }
 
 static void
-unfreshen_channels(struct server *srv)
+clear_inactive_flags(struct server *srv)
 {
 	size_t i, len;
 
-	/* TODO rename. unfreshen? */
-
 	len = sizeof(srv->chs) / sizeof(*srv->chs);
 	for (i = 1; i < len && srv->chs[i].name[0]; i++) {
-		srv->chs[i].fresh = 0;
+		srv->chs[i].active = 0;
 	}
 }
 
@@ -475,15 +473,13 @@ print_ch_tree(struct server *svs, size_t n)
 }
 
 static void
-remove_unfresh(struct server *srv)
+remove_inactives(struct server *srv)
 {
 	size_t i, len;
 
-	/* TODO rename */
-
 	len = sizeof(srv->chs) / sizeof(*srv->chs);
 	for (i = 0; i < len && srv->chs[i].name[0]; i++) {
-		if (!srv->chs[i].fresh)
+		if (!srv->chs[i].active)
 			remove_channel(srv, i);
 	}
 }
@@ -501,7 +497,7 @@ find_channels(struct server *srv)
 	if (chdir(srv->name) < 0)
 		die("find_channels: can't chdir\n");
 
-	unfreshen_channels(srv); /* TODO more elegant solution */
+	clear_inactive_flags(srv); /* TODO more elegant solution */
 
 	/* TODO dry from find_servers */
 	errno = 0;
@@ -512,7 +508,7 @@ find_channels(struct server *srv)
 	if (errno)
 		die("find_channels: error reading directory entries\n");
 
-	remove_unfresh(srv);
+	remove_inactives(srv);
 	chdir(".."); /* TODO getcwd() */
 	closedir(ds);
 }
