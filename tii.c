@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,9 +50,14 @@ struct srv_list {
 };
 
 static void
-die(char *msg)
+die(char *fmt, ...)
 {
-	fputs(msg, stderr);
+	va_list ap;
+
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+
 	exit(EXIT_FAILURE);
 }
 
@@ -111,9 +117,10 @@ send_input(struct server *srv, struct inbuf *in)
 	if (!getcwd(cwd, sizeof(cwd)))
 		die("send_input: failed to get cwd\n");
 	if (chdir(srv->name) < 0)
-		die("send_input: failed to chdir\n"); /* TODO detail */
+		die("send_input: cant chdir to %s\n", srv->name);
 	if (chdir(srv->chs[srv->i].name) < 0)
-		die("send_input: failed to chdir\n"); /* TODO detail */
+		die("send_input: cant to chdir to %s\n",
+		    srv->chs[srv->i].name);
 
 	fd = open("in", O_WRONLY | O_NONBLOCK);
 		/* TODO keep open all the time? */
@@ -153,9 +160,7 @@ stdin_ready(void)
 static void
 change_channel(struct server *srv, struct inbuf *in, char c)
 {
-	in->txt[0] = '\0'; /* TODO memset 0? */
-	in->i = 0;
-	/* TODO don't clear if not changing */
+	clear_input(in); /* TODO don't clear if not changing */
 
 	if (c == CTRL_L) {
 		if (srv->chs[srv->i + 1].name[0])
@@ -171,14 +176,13 @@ change_channel(struct server *srv, struct inbuf *in, char c)
 }
 
 static void
-erase_character(struct server *srv, struct inbuf *in)
+erase_character(struct inbuf *in)
 {
 	/* TODO check all edge cases */
 
 	if (in->i)
 		--in->i;
 	in->txt[in->i] = '\0';
-	srv->chs[srv->i].notify = 1; /* TODO don't need notify here? */
 }
 
 static void
@@ -194,8 +198,6 @@ append_input(struct inbuf *in, char c)
 static void
 change_server(struct srv_list *sl, char c)
 {
-	struct server *srv;
-
 	if (c == CTRL_N) {
 		if (sl->svs[sl->i + 1].name[0])
 			sl->i++;
@@ -207,9 +209,6 @@ change_server(struct srv_list *sl, char c)
 		if (sl->i)
 			sl->i--;
 	}
-
-	srv = &sl->svs[sl->i];
-	srv->chs[srv->i].notify = 1; /* TODO necessary? */
 }
 
 static void
@@ -221,7 +220,7 @@ handle_input(struct srv_list *sl, struct inbuf *in)
 	if (!stdin_ready())
 		return;
 
-	/* TODO protect against column overflow */
+	/* TODO protect against column overflow? */
 
 	c = getchar();
 	if (c == CTRL_H || c == CTRL_L)
@@ -231,13 +230,13 @@ handle_input(struct srv_list *sl, struct inbuf *in)
 	else if (c == CTRL_U)
 		clear_input(in);
 	else if (c == BCKSP)
-		erase_character(srv, in);
+		erase_character(in);
 	else if (c == '\n' && in->i)
 		send_input(srv, in);
 	else if (isprint(c))
 		append_input(in, c);
 	else
-		(void)0; /* TODO what? */
+		fprintf(stderr, "handle_input: invalid char\n");
 
 	srv->chs[srv->i].notify = 1;
 }
@@ -250,8 +249,6 @@ raw_term(void)
 	tcgetattr(STDIN_FILENO, &attr);
 	attr.c_lflag &= ~(ICANON | ECHO);
 	tcsetattr(STDIN_FILENO, TCSANOW, &attr);
-
-	/* TODO sufficient with just setbuf */
 }
 
 static void
@@ -341,8 +338,7 @@ init_channel(struct server *srv, size_t i, char *name)
 	chdir(name); /* TODO check return */
 	srv->chs[i].out = open("out", O_RDONLY); /* TODO dont create */
 	if (srv->chs[i].out < 0)
-		die("init_channel: failed to open 'out' file\n");
-		/* TODO descriptive err msg */
+		die("init_channel: can't open %ss 'out' file\n", name);
 
 	chdir(cwd);
 }
@@ -379,10 +375,8 @@ is_dir(struct dirent *de)
 {
 	struct stat sb;
 
-	if (stat(de->d_name, &sb) < 0) {
-		die("is_dir: error on stat()\n");
-		/* TODO more info */
-	}
+	if (stat(de->d_name, &sb) < 0)
+		die("is_dir: error on stat(%s)\n", de->d_name);
 
 	return S_ISDIR(sb.st_mode);
 }
@@ -529,6 +523,4 @@ main(void)
 		print_outputs(&sl.svs[sl.i], in.txt);
 		handle_input(&sl, &in);
 	}
-
-	return EXIT_SUCCESS; /* TODO not reachable */
 }
