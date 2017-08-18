@@ -27,7 +27,7 @@ enum {
 };
 
 struct inbuf {
-	char txt[BUFSIZ];
+	char txt[BUFSIZ]; /* TODO smaller buffer? */
 	size_t i;
 };
 
@@ -94,7 +94,10 @@ is_all_blanks(struct inbuf *in)
 {
 	size_t i;
 
-	/* TODO strnlen vs posix.1-2001 */
+	/* TODO is_valid_inbuf() */
+	if (in->txt[sizeof(in->txt) - 1] != '\0')
+		die("is_all_blanks: corrupt C string\n");
+
 	for (i = 0; i < strlen(in->txt); i++) {
 		if (!isspace(in->txt[i]))
 			return 0;
@@ -140,7 +143,6 @@ send_input(struct server *srv, struct inbuf *in)
 
 exit:
 	clear_input(in);
-
 	chdir(cwd);
 	close(fd);
 }
