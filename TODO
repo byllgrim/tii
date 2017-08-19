@@ -1,0 +1,22 @@
+TODOs
+=====
+Not all of these are certainly good ideas
+
+close all opened dirs and files
+add_server -> server_add
+don't return void on all functions
+use write() instead of printf/puts
+don't nonportable use open/read/write?
+blockbuffer stdout
+less ternary ? operator
+sv:  irc.freenode.net [irc.oftc.net]
+nb: Notification message
+jk instead of np
+indicate notify in other/unselected server
+detect server disconnect
+indicate sending to closed fifo "in: ! ..."
+indicate server index "ch: ... 3/4"
+set_notify(srv, srv->i, 1);
+notify redraw without user input
+.notify -> .alert
+reset terminal settings atexit
