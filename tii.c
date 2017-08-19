@@ -254,6 +254,18 @@ raw_term(void)
 }
 
 static void
+nonraw_term(void)
+{
+	struct termios attr;
+
+	tcgetattr(STDIN_FILENO, &attr);
+	attr.c_lflag |= ICANON | ECHO;
+	tcsetattr(STDIN_FILENO, TCSANOW, &attr);
+
+	/* TODO DRY from raw_term() */
+}
+
+static void
 print_tail(int fd)
 {
 	off_t pos, end;
@@ -520,6 +532,8 @@ main(void)
 	print_ch_tree(sl.svs, sizeof(sl.svs)/sizeof(*sl.svs));
 
 	raw_term();
+	atexit(nonraw_term);
+
 	for (;;) {
 		find_channels(&sl.svs[sl.i]);
 		print_outputs(&sl.svs[sl.i], in.txt);
