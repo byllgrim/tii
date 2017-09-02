@@ -1,3 +1,4 @@
+/* See LICENSE file for license details */
 #include <sys/stat.h>
 
 #include <ctype.h>
