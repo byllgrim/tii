@@ -19,3 +19,4 @@ indicate server index "ch: ... 3/4"
 set_notify(srv, srv->i, 1);
 notify redraw without user input
 .notify -> .alert
+v and ^ to indicate server notification
